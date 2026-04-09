@@ -26,12 +26,23 @@ async function supabase(table, { method = 'GET', filters = '', body = null, head
 
 // DIRECTORIES constant
 const DIRECTORIES = [
+    // Ελληνικοί
     { id: 'xo_gr', name: 'Χρυσός Οδηγός (xo.gr)', url: 'https://www.xo.gr', type: 'Ελληνικός' },
     { id: 'vrisko', name: 'Vrisko.gr (11880)', url: 'https://www.vrisko.gr', type: 'Ελληνικός' },
+    { id: 'vres', name: 'Vres.gr', url: 'https://www.vres.gr', type: 'Ελληνικός' },
+    // Πλοήγηση / Χάρτες
+    { id: 'waze', name: 'Waze', url: 'https://www.waze.com', type: 'Χάρτες' },
+    { id: 'tomtom', name: 'TomTom', url: 'https://www.tomtom.com', type: 'Χάρτες' },
+    { id: 'here', name: 'HERE WeGo', url: 'https://wego.here.com', type: 'Χάρτες' },
+    { id: 'apple_business', name: 'Apple Business Connect', url: 'https://businessconnect.apple.com', type: 'Χάρτες' },
+    { id: 'openstreetmap', name: 'OpenStreetMap', url: 'https://www.openstreetmap.org', type: 'Χάρτες' },
+    // Reviews / Social
+    { id: 'tripadvisor', name: 'TripAdvisor', url: 'https://www.tripadvisor.com', type: 'Reviews' },
+    { id: 'foursquare', name: 'Foursquare', url: 'https://foursquare.com', type: 'Reviews' },
+    { id: 'trustpilot', name: 'Trustpilot', url: 'https://www.trustpilot.com', type: 'Reviews' },
+    // Ευρωπαϊκοί / Διεθνείς
     { id: 'europages', name: 'Europages', url: 'https://www.europages.gr', type: 'Ευρωπαϊκός' },
-    { id: 'bing_places', name: 'Bing Places', url: 'https://www.bingplaces.com', type: 'Παγκόσμιος' },
-    { id: 'foursquare', name: 'Foursquare', url: 'https://foursquare.com', type: 'Παγκόσμιος' },
-    { id: 'apple_business', name: 'Apple Business Connect', url: 'https://businessconnect.apple.com', type: 'Παγκόσμιος' },
     { id: 'cybo', name: 'Cybo', url: 'https://www.cybo.com', type: 'Διεθνής' },
     { id: 'infobel', name: 'Infobel', url: 'https://www.infobel.com', type: 'Ευρωπαϊκός' },
+    { id: 'yandex', name: 'Yandex Maps', url: 'https://yandex.com/maps', type: 'Διεθνής' },
 ];

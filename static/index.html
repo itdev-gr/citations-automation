@@ -21,6 +21,7 @@
     <div class="tab" data-tab="submit">Υποβολή</div>
     <div class="tab" data-tab="status">Κατάσταση</div>
     <div class="tab" data-tab="guide">Οδηγός</div>
+    <div class="tab" data-tab="settings">Ρυθμίσεις</div>
 </div>
 
 <div class="content">
@@ -476,6 +477,39 @@
             </table>
         </div>
 
+    </div>
+
+    <!-- ΡΥΘΜΙΣΕΙΣ -->
+    <div class="tab-content" id="tab-settings">
+        <div class="card">
+            <h2>CAPTCHA Solver (2Captcha)</h2>
+            <p style="font-size:13px;color:var(--gray-500);margin-bottom:12px">
+                Για αυτόματη επίλυση CAPTCHA χρειάζεται λογαριασμός στο
+                <a href="https://2captcha.com/?from=23telegramdeveloperbots" target="_blank">2captcha.com</a>.
+                Κόστος: ~$2-3 ανά 1000 CAPTCHAs. Χωρίς αυτό, ο αυτοματισμός σταματάει στα CAPTCHA.
+            </p>
+            <div class="form-grid" style="max-width:500px">
+                <div class="form-group">
+                    <label>2Captcha API Key</label>
+                    <input type="text" id="setting_twocaptcha" placeholder="Εισάγετε το API key...">
+                </div>
+            </div>
+            <div class="btn-group">
+                <button class="btn btn-primary" onclick="saveCaptchaKey()">Αποθήκευση</button>
+            </div>
+            <div id="captchaStatus" style="margin-top:10px;font-size:13px;color:var(--gray-500)"></div>
+        </div>
+
+        <div class="card">
+            <h2>Automation Server</h2>
+            <p style="font-size:13px;color:var(--gray-500);margin-bottom:8px">
+                Σύνδεση με τον VPS server που τρέχει τον αυτοματισμό.
+            </p>
+            <div style="display:flex;gap:10px;align-items:center">
+                <span style="font-size:14px;font-weight:500">Status:</span>
+                <span id="serverStatus" class="badge badge-pending">Checking...</span>
+            </div>
+        </div>
     </div>
 
 </div>

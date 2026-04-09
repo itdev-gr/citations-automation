@@ -66,3 +66,21 @@ def upsert_submission(business_id: int, directory_id: str, status: str, notes: s
                  body={"status": status, "notes": notes, "url": url})
     else:
         _request("citations_submissions", method="POST", body=body)
+
+
+def get_setting(key: str) -> str:
+    """Get a setting value from citations_settings."""
+    result = _request("citations_settings", filters=f"key=eq.{key}")
+    return result[0]["value"] if result else None
+
+
+def save_setting(key: str, value: str):
+    """Save a setting to citations_settings."""
+    existing = _request("citations_settings", filters=f"key=eq.{key}")
+    if existing:
+        _request("citations_settings", method="PATCH",
+                 filters=f"key=eq.{key}",
+                 body={"value": value})
+    else:
+        _request("citations_settings", method="POST",
+                 body={"key": key, "value": value})

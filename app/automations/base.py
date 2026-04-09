@@ -1,5 +1,7 @@
 import asyncio
+import os
 from playwright.async_api import async_playwright, Page, Browser
+from playwright_stealth import stealth_async
 from typing import Optional, Callable
 from dataclasses import dataclass, field
 
@@ -18,6 +20,65 @@ class ProgressEvent:
     step: str
     status: str  # "running", "waiting_human", "success", "error"
     message: str
+
+
+async def solve_recaptcha_v2(page: Page, sitekey: str = None) -> bool:
+    """Solve reCAPTCHA v2 using 2Captcha service."""
+    api_key = os.environ.get("TWOCAPTCHA_API_KEY", "")
+    if not api_key:
+        return False
+
+    try:
+        from twocaptcha import TwoCaptcha
+        solver = TwoCaptcha(api_key)
+
+        # Find sitekey from page if not provided
+        if not sitekey:
+            sitekey = await page.evaluate("""
+                () => {
+                    const el = document.querySelector('.g-recaptcha, [data-sitekey]');
+                    return el ? el.getAttribute('data-sitekey') : null;
+                }
+            """)
+
+        if not sitekey:
+            return False
+
+        url = page.url
+
+        # Solve in background thread (blocking call)
+        loop = asyncio.get_event_loop()
+        result = await loop.run_in_executor(
+            None,
+            lambda: solver.recaptcha(sitekey=sitekey, url=url)
+        )
+
+        token = result.get('code', '')
+        if not token:
+            return False
+
+        # Inject the token into the page
+        await page.evaluate(f"""
+            () => {{
+                const textarea = document.getElementById('g-recaptcha-response');
+                if (textarea) {{
+                    textarea.style.display = 'block';
+                    textarea.value = '{token}';
+                }}
+                // Also try callback
+                if (typeof ___grecaptcha_cfg !== 'undefined') {{
+                    Object.entries(___grecaptcha_cfg.clients).forEach(([k, v]) => {{
+                        const callback = v?.['P']?.['P']?.callback || v?.callback;
+                        if (typeof callback === 'function') callback('{token}');
+                    }});
+                }}
+            }}
+        """)
+        return True
+
+    except Exception as e:
+        print(f"2Captcha error: {e}")
+        return False
 
 
 class BaseAutomation:
@@ -50,34 +111,73 @@ class BaseAutomation:
         """Called when user signals they've completed the manual action."""
         self._human_event.set()
 
+    async def try_solve_captcha(self, page: Page) -> bool:
+        """Try to solve reCAPTCHA on the page. Returns True if solved."""
+        # Check if there's a reCAPTCHA on the page
+        has_captcha = await page.evaluate("""
+            () => {
+                return !!(
+                    document.querySelector('.g-recaptcha') ||
+                    document.querySelector('[data-sitekey]') ||
+                    document.querySelector('iframe[src*="recaptcha"]')
+                );
+            }
+        """)
+
+        if not has_captcha:
+            return True  # No CAPTCHA = success
+
+        await self.emit("captcha", "running", "Λύνω CAPTCHA αυτόματα...")
+
+        solved = await solve_recaptcha_v2(page)
+        if solved:
+            await self.emit("captcha", "running", "CAPTCHA λύθηκε!")
+            return True
+        else:
+            # Fall back to human
+            await self.emit("captcha", "waiting_human",
+                "Δεν μπόρεσα να λύσω το CAPTCHA αυτόματα. Λύστε το χειροκίνητα και πατήστε 'Συνέχεια'.")
+            return False
+
     async def run(self, business: dict) -> AutomationResult:
         """Run the full automation flow for a business."""
         try:
-            await self.emit("start", "running", f"Starting {self.directory_name}...")
+            await self.emit("start", "running", f"Εκκίνηση {self.directory_name}...")
 
             async with async_playwright() as p:
                 browser = await p.chromium.launch(
                     headless=True,
-                    slow_mo=200,
+                    args=[
+                        '--no-sandbox',
+                        '--disable-blink-features=AutomationControlled',
+                        '--disable-dev-shm-usage',
+                    ],
                 )
                 context = await browser.new_context(
-                    viewport={"width": 1280, "height": 900},
+                    viewport={"width": 1366, "height": 768},
                     locale="el-GR",
+                    user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
                 )
                 page = await context.new_page()
 
-                await self.emit("navigate", "running", f"Opening {self.registration_url}...")
+                # Apply stealth to avoid detection
+                await stealth_async(page)
+
+                await self.emit("navigate", "running", f"Άνοιγμα {self.registration_url}...")
                 await page.goto(self.registration_url, wait_until="domcontentloaded", timeout=30000)
 
-                await self.emit("fill", "running", "Filling form fields...")
+                await self.emit("fill", "running", "Συμπλήρωση πεδίων...")
                 await self.fill_form(page, business)
 
-                await self.emit("review", "waiting_human",
-                    "Form filled! Review the data, solve any CAPTCHA, then click Continue in the dashboard.")
-                self._human_event.clear()
-                await self._human_event.wait()
+                # Try auto-solving CAPTCHA
+                captcha_solved = await self.try_solve_captcha(page)
 
-                await self.emit("submit", "running", "Submitting...")
+                if not captcha_solved:
+                    # Wait for human to solve CAPTCHA
+                    self._human_event.clear()
+                    await self._human_event.wait()
+
+                await self.emit("submit", "running", "Υποβολή...")
                 result = await self.submit(page, business)
 
                 await asyncio.sleep(3)
@@ -87,7 +187,7 @@ class BaseAutomation:
                 return result
 
         except Exception as e:
-            error_msg = f"Error: {str(e)}"
+            error_msg = f"Σφάλμα: {str(e)}"
             await self.emit("error", "error", error_msg)
             return AutomationResult(
                 success=False,
@@ -104,7 +204,7 @@ class BaseAutomation:
         return AutomationResult(
             success=True,
             directory_id=self.directory_id,
-            message="Submitted successfully (manual verification may be needed)",
+            message="Υποβλήθηκε επιτυχώς",
         )
 
     # Helper methods for common form operations

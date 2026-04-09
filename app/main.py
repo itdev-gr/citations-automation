@@ -1,12 +1,14 @@
 import asyncio
 import json
+import os
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, StreamingResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 
 from .models import SubmissionRequest
-from .supabase_db import get_business, upsert_submission
+from .supabase_db import get_business, upsert_submission, get_setting, save_setting
 from .automations.xo_gr import XoGrAutomation
 from .automations.vrisko import VriskoAutomation
 from .automations.europages import EuropagesAutomation
@@ -54,9 +56,36 @@ app.add_middleware(
 
 
 
+@app.on_event("startup")
+async def load_settings():
+    """Load 2Captcha API key from Supabase on startup."""
+    key = get_setting("twocaptcha_api_key")
+    if key:
+        os.environ["TWOCAPTCHA_API_KEY"] = key
+
+
+class SettingUpdate(BaseModel):
+    key: str
+    value: str
+
+
 @app.get("/api/directories")
 async def list_directories():
     return DIRECTORIES
+
+
+@app.post("/api/settings")
+async def update_setting(s: SettingUpdate):
+    save_setting(s.key, s.value)
+    if s.key == "twocaptcha_api_key":
+        os.environ["TWOCAPTCHA_API_KEY"] = s.value
+    return {"message": "Setting saved"}
+
+
+@app.get("/api/settings/{key}")
+async def read_setting(key: str):
+    val = get_setting(key)
+    return {"key": key, "value": val or ""}
 
 
 # --- Automation ---

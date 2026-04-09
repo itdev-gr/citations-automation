@@ -11,6 +11,8 @@ document.addEventListener('DOMContentLoaded', () => {
     loadSubmissions();
     document.getElementById('connectionStatus').textContent = 'Online';
     document.getElementById('connectionStatus').style.color = '#86efac';
+    checkServerStatus();
+    loadSettings();
 });
 
 // --- Tabs ---
@@ -529,6 +531,49 @@ async function loadStatusMatrix() {
         }).join('');
         return `<tr><td><strong>${esc(b.name)}</strong></td>${cells}</tr>`;
     }).join('');
+}
+
+// --- Settings ---
+async function saveCaptchaKey() {
+    const key = document.getElementById('setting_twocaptcha').value.trim();
+    if (!key) { alert('Εισάγετε το API key'); return; }
+    try {
+        const res = await fetch(`${AUTOMATION_API}/api/settings`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ key: 'twocaptcha_api_key', value: key }),
+        });
+        if (res.ok) {
+            document.getElementById('captchaStatus').textContent = 'API key αποθηκεύτηκε!';
+            document.getElementById('captchaStatus').style.color = 'var(--success)';
+        }
+    } catch (e) {
+        document.getElementById('captchaStatus').textContent = 'Σφάλμα σύνδεσης με τον server';
+        document.getElementById('captchaStatus').style.color = 'var(--danger)';
+    }
+}
+
+async function loadSettings() {
+    try {
+        const res = await fetch(`${AUTOMATION_API}/api/settings/twocaptcha_api_key`);
+        if (res.ok) {
+            const data = await res.json();
+            if (data.value) document.getElementById('setting_twocaptcha').value = data.value;
+        }
+    } catch (e) {}
+}
+
+async function checkServerStatus() {
+    try {
+        const res = await fetch(`${AUTOMATION_API}/api/directories`, { signal: AbortSignal.timeout(5000) });
+        if (res.ok) {
+            document.getElementById('serverStatus').className = 'badge badge-submitted';
+            document.getElementById('serverStatus').textContent = 'Online';
+        }
+    } catch (e) {
+        document.getElementById('serverStatus').className = 'badge badge-error';
+        document.getElementById('serverStatus').textContent = 'Offline';
+    }
 }
 
 // --- Helpers ---

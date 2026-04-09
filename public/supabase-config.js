@@ -1,5 +1,5 @@
-// VPS Automation Server (Cloudflare Tunnel - HTTPS)
-const AUTOMATION_API = 'https://broadband-solve-dome-magnificent.trycloudflare.com';
+// VPS Automation Server
+const AUTOMATION_API = 'https://api.softwarecitations.com';
 
 // Supabase Configuration
 const SUPABASE_URL = 'https://jkbxdjuszhrnbvivsuvw.supabase.co';

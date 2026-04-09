@@ -29,6 +29,8 @@ from .automations.yellowplace import YellowPlaceAutomation
 from .automations.showmelocal import ShowMeLocalAutomation
 from .automations.globalcatalog import GlobalCatalogAutomation
 from .automations.twofindlocal import TwoFindLocalAutomation
+from .automations.trustpilot import TrustpilotAutomation
+from .automations.citymaps import CityMapsAutomation
 
 AUTOMATION_MAP = {
     "xo_gr": XoGrAutomation,
@@ -51,6 +53,8 @@ AUTOMATION_MAP = {
     "showmelocal": ShowMeLocalAutomation,
     "globalcatalog": GlobalCatalogAutomation,
     "twofindlocal": TwoFindLocalAutomation,
+    "trustpilot": TrustpilotAutomation,
+    "citymaps": CityMapsAutomation,
 }
 
 DIRECTORIES = [
@@ -78,6 +82,8 @@ DIRECTORIES = [
     {"id": "showmelocal", "name": "ShowMeLocal", "url": "https://www.showmelocal.com", "type": "Διεθνής"},
     {"id": "globalcatalog", "name": "GlobalCatalog", "url": "https://www.globalcatalog.com", "type": "Διεθνής"},
     {"id": "twofindlocal", "name": "2FindLocal", "url": "https://www.2findlocal.com", "type": "Διεθνής"},
+    {"id": "trustpilot", "name": "Trustpilot", "url": "https://www.trustpilot.com", "type": "Reviews"},
+    {"id": "citymaps", "name": "CityMaps.gr", "url": "https://citymaps.gr", "type": "Ελληνικός"},
 ]
 
 # Global state for active automation

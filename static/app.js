@@ -255,6 +255,8 @@ const DIR_REG_URLS = {
     showmelocal: 'https://www.showmelocal.com/CreateBusiness.aspx',
     globalcatalog: 'https://www.globalcatalog.com/add-business.html',
     twofindlocal: 'https://www.2findlocal.com/add-business',
+    trustpilot: 'https://business.trustpilot.com/signup',
+    citymaps: 'https://citymaps.gr/',
 };
 
 // Which fields each directory needs (for the copy panel)
@@ -449,6 +451,22 @@ const DIR_FIELDS = {
         { label: 'Website', key: 'website' },
         { label: 'Category', key: 'category_en', fallback: 'category' },
         { label: 'Country', key: '_static', value: 'Greece' },
+    ],
+    trustpilot: [
+        { label: 'Company Name', key: 'name_en', fallback: 'name' },
+        { label: 'Website', key: 'website' },
+        { label: 'Email', key: 'email' },
+        { label: 'Phone', key: 'phone' },
+    ],
+    citymaps: [
+        { label: 'Επωνυμία', key: 'name' },
+        { label: 'Τηλέφωνο', key: 'phone' },
+        { label: 'Email', key: 'email' },
+        { label: 'Διεύθυνση', key: 'address' },
+        { label: 'Πόλη', key: 'city' },
+        { label: 'Website', key: 'website' },
+        { label: 'Κατηγορία', key: 'category' },
+        { label: 'Περιγραφή', key: 'description_gr' },
     ],
 };
 

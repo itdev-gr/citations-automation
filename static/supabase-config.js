@@ -50,4 +50,6 @@ const DIRECTORIES = [
     { id: 'showmelocal', name: 'ShowMeLocal', url: 'https://www.showmelocal.com', type: 'Διεθνής' },
     { id: 'globalcatalog', name: 'GlobalCatalog', url: 'https://www.globalcatalog.com', type: 'Διεθνής' },
     { id: 'twofindlocal', name: '2FindLocal', url: 'https://www.2findlocal.com', type: 'Διεθνής' },
+    { id: 'trustpilot', name: 'Trustpilot', url: 'https://www.trustpilot.com', type: 'Reviews' },
+    { id: 'citymaps', name: 'CityMaps.gr', url: 'https://citymaps.gr', type: 'Ελληνικός' },
 ];

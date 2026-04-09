@@ -1,17 +1,36 @@
 // State
 let businesses = [];
-let directories = [];
+let directories = DIRECTORIES;
 let submissions = [];
-let eventSource = null;
 
 // --- Init ---
 document.addEventListener('DOMContentLoaded', () => {
     initTabs();
-    loadDirectories();
+    renderDirectoryGrid();
     loadBusinesses();
     loadSubmissions();
-    connectSSE();
+    checkLocalServer();
 });
+
+// --- Check if local automation server is running ---
+let localServerAvailable = false;
+let eventSource = null;
+
+async function checkLocalServer() {
+    try {
+        const res = await fetch('http://localhost:8000/api/directories', { signal: AbortSignal.timeout(2000) });
+        if (res.ok) {
+            localServerAvailable = true;
+            document.getElementById('connectionStatus').textContent = 'Automation: Online';
+            document.getElementById('connectionStatus').style.color = '#86efac';
+            connectSSE();
+        }
+    } catch {
+        localServerAvailable = false;
+        document.getElementById('connectionStatus').textContent = 'Automation: Offline (μόνο διαχείριση)';
+        document.getElementById('connectionStatus').style.color = '#fcd34d';
+    }
+}
 
 // --- Tabs ---
 function initTabs() {
@@ -28,18 +47,10 @@ function initTabs() {
     });
 }
 
-// --- API helpers ---
-async function api(path, options = {}) {
-    const res = await fetch('/api' + path, {
-        headers: { 'Content-Type': 'application/json' },
-        ...options,
-    });
-    return res.json();
-}
-
-// --- Businesses ---
+// --- Businesses (Supabase) ---
 async function loadBusinesses() {
-    businesses = await api('/businesses');
+    businesses = await supabase('citations_businesses', { filters: 'order=created_at.desc' });
+    if (!Array.isArray(businesses)) businesses = [];
     renderBusinessList();
     populateBusinessSelect();
 }
@@ -111,9 +122,13 @@ async function saveBusiness() {
 
     const id = document.getElementById('editBusinessId').value;
     if (id) {
-        await api('/businesses/' + id, { method: 'PUT', body: JSON.stringify(data) });
+        await supabase('citations_businesses', {
+            method: 'PATCH',
+            filters: `id=eq.${id}`,
+            body: data,
+        });
     } else {
-        await api('/businesses', { method: 'POST', body: JSON.stringify(data) });
+        await supabase('citations_businesses', { method: 'POST', body: data });
     }
     hideBusinessForm();
     await loadBusinesses();
@@ -125,7 +140,9 @@ function editBusiness(id) {
 
 async function deleteBusiness(id) {
     if (!confirm('Διαγραφή αυτής της επιχείρησης και όλων των καταχωρήσεών της;')) return;
-    await api('/businesses/' + id, { method: 'DELETE' });
+    // Delete submissions first, then business
+    await supabase('citations_submissions', { method: 'DELETE', filters: `business_id=eq.${id}` });
+    await supabase('citations_businesses', { method: 'DELETE', filters: `id=eq.${id}` });
     await loadBusinesses();
     await loadSubmissions();
 }
@@ -133,25 +150,98 @@ async function deleteBusiness(id) {
 // --- CSV ---
 async function importCSV(input) {
     if (!input.files.length) return;
-    const formData = new FormData();
-    formData.append('file', input.files[0]);
-    const res = await fetch('/api/businesses/import-csv', { method: 'POST', body: formData });
-    const result = await res.json();
-    alert(result.message || 'Η εισαγωγή ολοκληρώθηκε');
+    const text = await input.files[0].text();
+    const lines = text.split('\n');
+    if (lines.length < 2) { alert('Το CSV είναι κενό'); return; }
+
+    const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/['"]/g, '').replace(/ /g, '_'));
+
+    const fieldMap = {
+        business_name: 'name', company_name: 'name', eponymia: 'name', name: 'name',
+        name_en: 'name_en', english_name: 'name_en',
+        address: 'address', dieuthinsi: 'address', street: 'address',
+        city: 'city', poli: 'city',
+        city_en: 'city_en',
+        postal_code: 'postal_code', zip: 'postal_code', tk: 'postal_code',
+        region: 'region', nomos: 'region',
+        phone: 'phone', tilefono: 'phone', tel: 'phone',
+        mobile: 'mobile', kinito: 'mobile',
+        email: 'email',
+        website: 'website', url: 'website',
+        category: 'category', kategoria: 'category',
+        category_en: 'category_en',
+        description_gr: 'description_gr', perigrafi: 'description_gr',
+        description_en: 'description_en',
+        hours: 'hours', ores: 'hours',
+        facebook: 'facebook', instagram: 'instagram', linkedin: 'linkedin',
+        tax_id: 'tax_id', afm: 'tax_id',
+        contact_person: 'contact_person',
+    };
+
+    const validFields = ['name','name_en','address','city','city_en','postal_code','region',
+        'phone','mobile','email','website','category','category_en','contact_person',
+        'tax_id','hours','facebook','instagram','linkedin','description_gr','description_en'];
+
+    let imported = 0;
+    for (let i = 1; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) continue;
+
+        // Simple CSV parsing (handles basic quoted fields)
+        const values = parseCSVLine(line);
+        const row = {};
+        headers.forEach((h, idx) => {
+            const field = fieldMap[h] || h;
+            if (validFields.includes(field)) {
+                row[field] = (values[idx] || '').trim();
+            }
+        });
+
+        if (row.name) {
+            await supabase('citations_businesses', { method: 'POST', body: row });
+            imported++;
+        }
+    }
+
+    alert(`Εισαγωγή ${imported} επιχειρήσεων ολοκληρώθηκε`);
     input.value = '';
     await loadBusinesses();
 }
 
+function parseCSVLine(line) {
+    const result = [];
+    let current = '';
+    let inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+        const ch = line[i];
+        if (ch === '"') { inQuotes = !inQuotes; }
+        else if (ch === ',' && !inQuotes) { result.push(current); current = ''; }
+        else { current += ch; }
+    }
+    result.push(current);
+    return result;
+}
+
 function exportCSV() {
-    window.location.href = '/api/businesses/export-csv';
+    if (!businesses.length) { alert('Δεν υπάρχουν επιχειρήσεις'); return; }
+    const fields = ['name','name_en','address','city','city_en','postal_code','region',
+        'phone','mobile','email','website','category','category_en',
+        'description_gr','description_en','hours','facebook','instagram',
+        'linkedin','tax_id','contact_person'];
+    let csv = fields.join(',') + '\n';
+    businesses.forEach(b => {
+        csv += fields.map(f => `"${(b[f] || '').replace(/"/g, '""')}"`).join(',') + '\n';
+    });
+    const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'businesses.csv';
+    a.click();
+    URL.revokeObjectURL(url);
 }
 
 // --- Directories ---
-async function loadDirectories() {
-    directories = await api('/directories');
-    renderDirectoryGrid();
-}
-
 function renderDirectoryGrid() {
     const grid = document.getElementById('directoryGrid');
     grid.innerHTML = directories.map(d => `
@@ -185,9 +275,7 @@ function populateBusinessSelect() {
     sel.value = val;
 }
 
-function onBusinessSelected() {
-    // Could show preview of business info
-}
+function onBusinessSelected() {}
 
 // Status label translations
 const STATUS_LABELS = {
@@ -205,6 +293,11 @@ function statusLabel(status) {
 }
 
 async function startAutomation() {
+    if (!localServerAvailable) {
+        alert('Ο local automation server δεν τρέχει.\n\nΓια να τρέξετε automation, ανοίξτε terminal και εκτελέστε:\ncd ~/Desktop/citations && python3 run.py');
+        return;
+    }
+
     const businessId = document.getElementById('submitBusinessSelect').value;
     if (!businessId) { alert('Επιλέξτε πρώτα μια επιχείρηση'); return; }
 
@@ -215,7 +308,6 @@ async function startAutomation() {
     document.getElementById('startBtn').textContent = 'Εκτελείται...';
     document.getElementById('progressCard').style.display = 'block';
 
-    // Init progress items
     const progressList = document.getElementById('progressList');
     progressList.innerHTML = dirs.map(d => {
         const dir = directories.find(x => x.id === d);
@@ -226,28 +318,36 @@ async function startAutomation() {
         </div>`;
     }).join('');
 
-    await api('/automate', {
-        method: 'POST',
-        body: JSON.stringify({ business_id: parseInt(businessId), directories: dirs }),
-    });
+    // Call local automation server
+    try {
+        await fetch('http://localhost:8000/api/automate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ business_id: parseInt(businessId), directories: dirs }),
+        });
+    } catch (e) {
+        alert('Σφάλμα σύνδεσης με τον local server: ' + e.message);
+        document.getElementById('startBtn').disabled = false;
+        document.getElementById('startBtn').textContent = 'Εκκίνηση Αυτοματισμού';
+    }
 }
 
 async function continueAutomation() {
-    await api('/automate/continue', { method: 'POST' });
-    document.getElementById('continueBar').classList.remove('visible');
+    try {
+        await fetch('http://localhost:8000/api/automate/continue', { method: 'POST' });
+        document.getElementById('continueBar').classList.remove('visible');
+    } catch (e) {
+        alert('Σφάλμα: ' + e.message);
+    }
 }
 
-// --- SSE ---
+// --- SSE (from local server) ---
 function connectSSE() {
-    eventSource = new EventSource('/api/events');
-    eventSource.onopen = () => {
-        document.getElementById('connectionStatus').textContent = 'Συνδεδεμένο';
-    };
+    eventSource = new EventSource('http://localhost:8000/api/events');
     eventSource.onmessage = (e) => {
         const data = JSON.parse(e.data);
         if (data.status === 'connected') return;
 
-        // Update progress item
         const item = document.getElementById('progress-' + data.directory_id);
         if (item) {
             const cssClass = data.status === 'waiting_human' ? 'waiting' : data.status === 'error' ? 'error' : (data.status === 'success' || data.status === 'submitted') ? 'success' : 'running';
@@ -260,13 +360,11 @@ function connectSSE() {
             item.querySelector('.message').textContent = data.message;
         }
 
-        // Show/hide continue bar
         if (data.status === 'waiting_human') {
             document.getElementById('continueMessage').textContent = data.message;
             document.getElementById('continueBar').classList.add('visible');
         }
 
-        // All done
         if (data.directory_id === 'all' && data.step === 'done') {
             document.getElementById('startBtn').disabled = false;
             document.getElementById('startBtn').textContent = 'Εκκίνηση Αυτοματισμού';
@@ -274,14 +372,12 @@ function connectSSE() {
             loadSubmissions();
         }
     };
-    eventSource.onerror = () => {
-        document.getElementById('connectionStatus').textContent = 'Επανασύνδεση...';
-    };
 }
 
-// --- Submissions / Status ---
+// --- Submissions (Supabase) ---
 async function loadSubmissions() {
-    submissions = await api('/submissions');
+    submissions = await supabase('citations_submissions', { filters: 'order=business_id' });
+    if (!Array.isArray(submissions)) submissions = [];
     renderBusinessList();
 }
 

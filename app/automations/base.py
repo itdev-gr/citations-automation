@@ -1,7 +1,7 @@
 import asyncio
 import os
 from playwright.async_api import async_playwright, Page, Browser
-from playwright_stealth import stealth_async
+from playwright_stealth import Stealth
 from typing import Optional, Callable
 from dataclasses import dataclass, field
 
@@ -158,10 +158,8 @@ class BaseAutomation:
                     locale="el-GR",
                     user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
                 )
-                page = await context.new_page()
-
-                # Apply stealth to avoid detection
-                await stealth_async(page)
+                stealth = Stealth()
+                page = await stealth.new_page(context)
 
                 await self.emit("navigate", "running", f"Άνοιγμα {self.registration_url}...")
                 await page.goto(self.registration_url, wait_until="domcontentloaded", timeout=30000)

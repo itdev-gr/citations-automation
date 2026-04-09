@@ -528,7 +528,21 @@ function updateProgressCard(data) {
         badge.textContent = statusLabel(data.status);
     }
     if (msgEl) msgEl.textContent = data.message || '';
-    if (card && (data.status === 'success' || data.status === 'complete')) card.classList.add('done');
+    if (card && (data.status === 'success' || data.status === 'complete')) {
+        card.classList.add('done');
+        // Add listing link if URL available
+        if (data.url) {
+            const actionsDiv = card.querySelector('.dir-card-actions');
+            if (actionsDiv && !actionsDiv.querySelector('.listing-link')) {
+                const link = document.createElement('a');
+                link.href = data.url;
+                link.target = '_blank';
+                link.className = 'btn btn-sm btn-success listing-link';
+                link.innerHTML = 'Δείτε την καταχώριση &rarr;';
+                actionsDiv.prepend(link);
+            }
+        }
+    }
 
     if (data.status === 'waiting_human' && card) {
         const actionsDiv = card.querySelector('.dir-card-actions');
@@ -592,6 +606,7 @@ function renderSubmitCards() {
                     <span class="badge badge-${isDone ? 'submitted' : 'pending'}" id="badge-${dirId}">${isDone ? 'Υποβλήθηκε' : 'Εκκρεμεί'}</span>
                 </div>
                 <div class="dir-card-actions">
+                    ${isDone && sub.url ? `<a href="${esc(sub.url)}" target="_blank" class="btn btn-sm btn-success listing-link">Καταχώριση &rarr;</a>` : ''}
                     <a href="${regUrl}" target="_blank" class="btn btn-sm btn-primary" onclick="trackOpen('${dirId}')">Άνοιγμα σελίδας &rarr;</a>
                     <button class="btn btn-sm btn-success" onclick="markSubmitted(${biz.id}, '${dirId}')">Ολοκληρώθηκε</button>
                 </div>
@@ -674,6 +689,10 @@ async function loadStatusMatrix() {
         const cells = directories.map(d => {
             const sub = submissions.find(s => s.business_id === b.id && s.directory_id === d.id);
             const status = sub ? sub.status : 'pending';
+            const url = sub && sub.url ? sub.url : '';
+            if (url && status === 'submitted') {
+                return `<td><a href="${esc(url)}" target="_blank" class="badge badge-${status}" style="text-decoration:none;cursor:pointer" title="Άνοιγμα καταχώρισης">${statusLabel(status)} ↗</a></td>`;
+            }
             return `<td><span class="badge badge-${status}">${statusLabel(status)}</span></td>`;
         }).join('');
         return `<tr><td><strong>${esc(b.name)}</strong></td>${cells}</tr>`;

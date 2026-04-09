@@ -173,6 +173,7 @@ async def start_automation(req: SubmissionRequest):
                 "step": "complete",
                 "status": status,
                 "message": result.message,
+                "url": result.url,
             })
 
         active_automation = None

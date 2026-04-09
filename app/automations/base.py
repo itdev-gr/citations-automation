@@ -158,8 +158,9 @@ class BaseAutomation:
                     locale="el-GR",
                     user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
                 )
+                page = await context.new_page()
                 stealth = Stealth()
-                page = await stealth.new_page(context)
+                await stealth.apply_stealth_async(page)
 
                 await self.emit("navigate", "running", f"Άνοιγμα {self.registration_url}...")
                 await page.goto(self.registration_url, wait_until="domcontentloaded", timeout=30000)

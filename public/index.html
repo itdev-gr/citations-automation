@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="el">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Citations Automation</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="header">
+    <div>
+        <h1>Citations Automation</h1>
+        <div class="subtitle">Αυτόματες καταχωρήσεις σε καταλόγους για Local SEO</div>
+    </div>
+    <div style="font-size:13px;opacity:0.8" id="connectionStatus">Σύνδεση...</div>
+</div>
+
+<div class="tabs">
+    <div class="tab active" data-tab="businesses">Επιχειρήσεις</div>
+    <div class="tab" data-tab="submit">Υποβολή</div>
+    <div class="tab" data-tab="status">Κατάσταση</div>
+    <div class="tab" data-tab="guide">Οδηγός</div>
+</div>
+
+<div class="content">
+
+    <!-- ΕΠΙΧΕΙΡΗΣΕΙΣ -->
+    <div class="tab-content active" id="tab-businesses">
+        <div class="card">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+                <h2>Επιχειρήσεις</h2>
+                <div class="btn-group" style="margin:0">
+                    <button class="btn btn-primary" onclick="showBusinessForm()">+ Νέα Επιχείρηση</button>
+                    <label class="btn btn-outline">
+                        Εισαγωγή CSV
+                        <input type="file" accept=".csv" style="display:none" onchange="importCSV(this)">
+                    </label>
+                    <button class="btn btn-outline" onclick="exportCSV()">Εξαγωγή CSV</button>
+                </div>
+            </div>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Επωνυμία</th>
+                            <th>Πόλη</th>
+                            <th>Τηλέφωνο</th>
+                            <th>Κατηγορία</th>
+                            <th>Καταχωρήσεις</th>
+                            <th>Ενέργειες</th>
+                        </tr>
+                    </thead>
+                    <tbody id="businessList"></tbody>
+                </table>
+                <div class="empty" id="emptyBusinesses">Δεν υπάρχουν επιχειρήσεις. Προσθέστε μία ή κάντε εισαγωγή CSV.</div>
+            </div>
+        </div>
+
+        <!-- Φόρμα Επιχείρησης -->
+        <div class="card" id="businessForm" style="display:none">
+            <h2 id="formTitle">Νέα Επιχείρηση</h2>
+            <input type="hidden" id="editBusinessId">
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>Επωνυμία (Ελληνικά) *</label>
+                    <input type="text" id="f_name" required placeholder="π.χ. Παπαδόπουλος Υδραυλικός">
+                </div>
+                <div class="form-group">
+                    <label>Επωνυμία (Αγγλικά)</label>
+                    <input type="text" id="f_name_en" placeholder="π.χ. Papadopoulos Plumbing">
+                </div>
+                <div class="form-group">
+                    <label>Διεύθυνση</label>
+                    <input type="text" id="f_address" placeholder="π.χ. Ερμού 15">
+                </div>
+                <div class="form-group">
+                    <label>Πόλη (Ελληνικά)</label>
+                    <input type="text" id="f_city" placeholder="π.χ. Αθήνα">
+                </div>
+                <div class="form-group">
+                    <label>Πόλη (Αγγλικά)</label>
+                    <input type="text" id="f_city_en" placeholder="π.χ. Athens">
+                </div>
+                <div class="form-group">
+                    <label>Τ.Κ.</label>
+                    <input type="text" id="f_postal_code" placeholder="π.χ. 10563">
+                </div>
+                <div class="form-group">
+                    <label>Περιοχή / Νομός</label>
+                    <input type="text" id="f_region" placeholder="π.χ. Αττική">
+                </div>
+                <div class="form-group">
+                    <label>Τηλέφωνο</label>
+                    <input type="text" id="f_phone" placeholder="π.χ. 210 1234567">
+                </div>
+                <div class="form-group">
+                    <label>Κινητό</label>
+                    <input type="text" id="f_mobile" placeholder="π.χ. 69X XXXX XXX">
+                </div>
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" id="f_email" placeholder="π.χ. info@example.gr">
+                </div>
+                <div class="form-group">
+                    <label>Website</label>
+                    <input type="url" id="f_website" placeholder="π.χ. https://www.example.gr">
+                </div>
+                <div class="form-group">
+                    <label>Κατηγορία (Ελληνικά)</label>
+                    <input type="text" id="f_category" placeholder="π.χ. Υδραυλικός">
+                </div>
+                <div class="form-group">
+                    <label>Κατηγορία (Αγγλικά)</label>
+                    <input type="text" id="f_category_en" placeholder="π.χ. Plumber">
+                </div>
+                <div class="form-group">
+                    <label>Υπεύθυνος Επικοινωνίας</label>
+                    <input type="text" id="f_contact_person" placeholder="π.χ. Γιώργος Παπαδόπουλος">
+                </div>
+                <div class="form-group">
+                    <label>ΑΦΜ</label>
+                    <input type="text" id="f_tax_id" placeholder="π.χ. 123456789">
+                </div>
+                <div class="form-group">
+                    <label>Ωράριο</label>
+                    <input type="text" id="f_hours" placeholder="π.χ. Δευ-Παρ 09:00-17:00">
+                </div>
+                <div class="form-group">
+                    <label>Facebook</label>
+                    <input type="url" id="f_facebook" placeholder="https://facebook.com/...">
+                </div>
+                <div class="form-group">
+                    <label>Instagram</label>
+                    <input type="url" id="f_instagram" placeholder="https://instagram.com/...">
+                </div>
+                <div class="form-group">
+                    <label>LinkedIn</label>
+                    <input type="url" id="f_linkedin" placeholder="https://linkedin.com/...">
+                </div>
+                <div class="form-group full">
+                    <label>Περιγραφή (Ελληνικά)</label>
+                    <textarea id="f_description_gr" placeholder="Σύντομη περιγραφή της επιχείρησης στα ελληνικά..."></textarea>
+                </div>
+                <div class="form-group full">
+                    <label>Περιγραφή (Αγγλικά)</label>
+                    <textarea id="f_description_en" placeholder="Short business description in English..."></textarea>
+                </div>
+            </div>
+            <div class="btn-group">
+                <button class="btn btn-primary" onclick="saveBusiness()">Αποθήκευση</button>
+                <button class="btn btn-outline" onclick="hideBusinessForm()">Ακύρωση</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ΥΠΟΒΟΛΗ -->
+    <div class="tab-content" id="tab-submit">
+        <div class="card">
+            <h2>1. Επιλέξτε Επιχείρηση</h2>
+            <select id="submitBusinessSelect" style="width:100%;padding:10px;border:1px solid var(--gray-300);border-radius:6px;font-size:14px" onchange="onBusinessSelected()">
+                <option value="">-- Επιλέξτε επιχείρηση --</option>
+            </select>
+        </div>
+
+        <div class="card">
+            <h2>2. Επιλέξτε Καταλόγους</h2>
+            <div style="margin-bottom:10px">
+                <button class="btn btn-sm btn-outline" onclick="selectAllDirs()">Επιλογή Όλων</button>
+                <button class="btn btn-sm btn-outline" onclick="deselectAllDirs()">Αποεπιλογή Όλων</button>
+            </div>
+            <div class="dir-grid" id="directoryGrid"></div>
+        </div>
+
+        <div class="card">
+            <h2>3. Εκκίνηση</h2>
+            <p style="font-size:13px;color:var(--gray-500);margin-bottom:12px">
+                Για κάθε κατάλογο θα εμφανιστούν τα στοιχεία έτοιμα για copy.
+                Πατήστε "Άνοιγμα σελίδας" για να ανοίξει ο κατάλογος σε νέο tab, κάντε copy-paste τα πεδία, και πατήστε "Ολοκληρώθηκε".
+            </p>
+            <button class="btn btn-success btn-lg" onclick="startAutomation()" id="startBtn">
+                Ξεκίνημα Υποβολών
+            </button>
+        </div>
+
+        <div class="card" id="progressCard" style="display:none">
+            <h2>Κατάλογοι</h2>
+            <div class="progress-list" id="progressList"></div>
+        </div>
+    </div>
+
+    <!-- ΚΑΤΑΣΤΑΣΗ -->
+    <div class="tab-content" id="tab-status">
+        <div class="card">
+            <h2>Πίνακας Καταχωρήσεων</h2>
+            <div class="table-wrap">
+                <table class="matrix-table" id="statusMatrix">
+                    <thead><tr><th>Επιχείρηση</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+            <div class="empty" id="emptyStatus">Δεν υπάρχουν καταχωρήσεις ακόμα.</div>
+        </div>
+    </div>
+
+    <!-- ΟΔΗΓΟΣ -->
+    <div class="tab-content" id="tab-guide">
+
+        <div class="card" style="background:linear-gradient(135deg,#eff6ff,#dbeafe);border:1px solid #bfdbfe">
+            <h2 style="margin-bottom:4px">Οδηγός Χρήσης</h2>
+            <p style="color:var(--gray-500)">
+                Αυτοματοποιημένες καταχωρήσεις επιχειρήσεων σε 8 online καταλόγους για Local SEO.
+            </p>
+        </div>
+
+        <!-- ΤΙ ΚΑΝΕΙ -->
+        <div class="card">
+            <h2>Τι κάνει αυτό το εργαλείο;</h2>
+            <p style="line-height:1.8">
+                Παίρνει τα στοιχεία μιας επιχείρησης (Όνομα, Διεύθυνση, Τηλέφωνο, κλπ) και τα
+                <strong>υποβάλλει αυτόματα</strong> σε online καταλόγους επιχειρήσεων.
+                Αυτές οι καταχωρήσεις (citations) βοηθούν την επιχείρηση να εμφανίζεται ψηλότερα
+                στα τοπικά αποτελέσματα αναζήτησης (Google Maps κλπ).
+            </p>
+            <p style="line-height:1.8;margin-top:8px">
+                Αντί να μπαίνετε χειροκίνητα σε κάθε κατάλογο και να συμπληρώνετε φόρμες,
+                το εργαλείο <strong>ανοίγει αυτόματα browser</strong>, συμπληρώνει τα πεδία,
+                και σταματάει μόνο όταν χρειάζεται κάτι χειροκίνητο (CAPTCHA, login).
+            </p>
+            <div style="background:var(--gray-50);padding:14px;border-radius:6px;margin-top:12px;font-size:14px;line-height:1.7">
+                <strong>~15-20 λεπτά</strong> ανά επιχείρηση για 8 καταλόγους (αντί 2+ ώρες χειροκίνητα)
+            </div>
+        </div>
+
+        <!-- ΒΗΜΑΤΑ -->
+        <div class="card">
+            <h2>Πώς δουλεύει βήμα-βήμα</h2>
+
+            <div class="guide-step">
+                <div class="guide-step-number">1</div>
+                <div class="guide-step-content">
+                    <h3>Προσθέστε επιχείρηση <span style="font-weight:400;color:var(--gray-500)">(tab "Επιχειρήσεις")</span></h3>
+                    <p>Πατήστε <strong>"+ Νέα Επιχείρηση"</strong> και συμπληρώστε τα στοιχεία.</p>
+                    <div class="guide-fields">
+                        <div class="guide-field required">
+                            <div class="guide-field-label">Υποχρεωτικά</div>
+                            <div>Επωνυμία (Ελληνικά)</div>
+                        </div>
+                        <div class="guide-field recommended">
+                            <div class="guide-field-label">Συνιστώμενα</div>
+                            <div>Επωνυμία EN, Διεύθυνση, Πόλη (GR+EN), Τηλέφωνο, Email, Website, Κατηγορία (GR+EN), Περιγραφή (GR+EN)</div>
+                        </div>
+                    </div>
+                    <p style="margin-top:8px;color:var(--gray-500);font-size:13px">
+                        Όσο περισσότερα πεδία συμπληρώσετε, τόσο καλύτερα δουλεύει ο αυτοματισμός.
+                    </p>
+                </div>
+            </div>
+
+            <div class="guide-step">
+                <div class="guide-step-number">2</div>
+                <div class="guide-step-content">
+                    <h3>Ξεκινήστε την υποβολή <span style="font-weight:400;color:var(--gray-500)">(tab "Υποβολή")</span></h3>
+                    <p>Επιλέξτε την επιχείρηση, τσεκάρετε τους καταλόγους, και πατήστε <strong>"Εκκίνηση Αυτοματισμού"</strong>.</p>
+                </div>
+            </div>
+
+            <div class="guide-step">
+                <div class="guide-step-number">3</div>
+                <div class="guide-step-content">
+                    <h3>Κατά τον αυτοματισμό</h3>
+                    <p>Για κάθε κατάλογο γίνονται τα εξής:</p>
+                    <div class="guide-flow">
+                        <div class="guide-flow-item">Ανοίγει browser</div>
+                        <div class="guide-flow-arrow">&rarr;</div>
+                        <div class="guide-flow-item">Πηγαίνει στη σελίδα εγγραφής</div>
+                        <div class="guide-flow-arrow">&rarr;</div>
+                        <div class="guide-flow-item highlight">Συμπληρώνει αυτόματα τα πεδία</div>
+                        <div class="guide-flow-arrow">&rarr;</div>
+                        <div class="guide-flow-item warning">Σταματάει - Εμφανίζεται πορτοκαλί μπάρα</div>
+                    </div>
+                    <p style="margin-top:12px">Εσείς:</p>
+                    <ol style="margin-left:20px;line-height:2">
+                        <li>Ελέγχετε τα στοιχεία στον browser</li>
+                        <li>Λύνετε τυχόν CAPTCHA</li>
+                        <li>Πατάτε <strong>"Συνέχεια"</strong> στην πορτοκαλί μπάρα</li>
+                    </ol>
+                    <p style="margin-top:4px;color:var(--gray-500);font-size:13px">Μετά προχωράει αυτόματα στον επόμενο κατάλογο.</p>
+                </div>
+            </div>
+
+            <div class="guide-step">
+                <div class="guide-step-number">4</div>
+                <div class="guide-step-content">
+                    <h3>Παρακολούθηση <span style="font-weight:400;color:var(--gray-500)">(tab "Κατάσταση")</span></h3>
+                    <p>Πίνακας με όλες τις επιχειρήσεις και τους καταλόγους. Κάθε κελί δείχνει:</p>
+                    <div style="display:flex;gap:16px;margin-top:10px;flex-wrap:wrap;align-items:center">
+                        <div><span class="badge badge-pending">Εκκρεμεί</span> Δεν έχει υποβληθεί</div>
+                        <div><span class="badge badge-running">Σε εξέλιξη</span> Τρέχει τώρα</div>
+                        <div><span class="badge badge-waiting">Αναμονή</span> Θέλει ενέργεια</div>
+                        <div><span class="badge badge-submitted">Ολοκληρώθηκε</span> Υποβλήθηκε</div>
+                        <div><span class="badge badge-error">Σφάλμα</span> Απέτυχε</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ΚΑΤΑΛΟΓΟΙ -->
+        <div class="card">
+            <h2>Υποστηριζόμενοι κατάλογοι (8)</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Κατάλογος</th>
+                        <th>Τύπος</th>
+                        <th>Λεπτομέρειες</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Χρυσός Οδηγός (xo.gr)</strong></td>
+                        <td><span class="badge badge-submitted">Ελληνικός</span></td>
+                        <td>Ο μεγαλύτερος ελληνικός κατάλογος. Δωρεάν εγγραφή. Αυτόματη συμπλήρωση φόρμας.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Vrisko.gr (11880)</strong></td>
+                        <td><span class="badge badge-submitted">Ελληνικός</span></td>
+                        <td>Δεύτερος μεγαλύτερος ελληνικός κατάλογος. Δωρεάν εγγραφή. Αυτόματη συμπλήρωση.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Europages</strong></td>
+                        <td><span class="badge badge-running">Ευρωπαϊκός</span></td>
+                        <td>Ευρωπαϊκός B2B κατάλογος. Χρησιμοποιεί την αγγλική επωνυμία/περιγραφή. Δωρεάν.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Bing Places</strong></td>
+                        <td><span class="badge badge-waiting">Παγκόσμιος</span></td>
+                        <td>Χάρτες Microsoft/Bing. Προσπαθεί πρώτα import από Google. Χρειάζεται λογαριασμό Microsoft.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Foursquare</strong></td>
+                        <td><span class="badge badge-waiting">Παγκόσμιος</span></td>
+                        <td>Τροφοδοτεί Uber, Apple Maps και πολλές άλλες εφαρμογές. Πολύ σημαντικός.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Apple Business Connect</strong></td>
+                        <td><span class="badge badge-waiting">Παγκόσμιος</span></td>
+                        <td>Εμφάνιση στο Apple Maps. Χρειάζεται Apple ID. Καθοδηγούμενη διαδικασία claim.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Cybo</strong></td>
+                        <td><span class="badge badge-pending">Διεθνής</span></td>
+                        <td>Διεθνής κατάλογος. Αυτόματη συμπλήρωση. Χρησιμοποιεί αγγλικά στοιχεία.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Infobel</strong></td>
+                        <td><span class="badge badge-pending">Ευρωπαϊκός</span></td>
+                        <td>Ευρωπαϊκός κατάλογος. Αναζήτηση και claim.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- TIPS -->
+        <div class="card">
+            <h2>Σημαντικές συμβουλές</h2>
+            <div class="guide-tips">
+                <div class="guide-tip">
+                    <div class="guide-tip-icon" style="background:#dcfce7;color:var(--success)">!</div>
+                    <div>
+                        <strong>Συνέπεια στα στοιχεία (NAP)</strong><br>
+                        <span style="color:var(--gray-500)">Χρησιμοποιήστε ακριβώς το ίδιο Όνομα, Διεύθυνση και Τηλέφωνο σε όλους τους καταλόγους. Αυτός είναι ο #1 παράγοντας για τα citations.</span>
+                    </div>
+                </div>
+                <div class="guide-tip">
+                    <div class="guide-tip-icon" style="background:#dbeafe;color:var(--primary)">!</div>
+                    <div>
+                        <strong>Συμπληρώστε Ελληνικά ΚΑΙ Αγγλικά</strong><br>
+                        <span style="color:var(--gray-500)">Οι ελληνικοί κατάλογοι χρησιμοποιούν τα ελληνικά, οι διεθνείς τα αγγλικά.</span>
+                    </div>
+                </div>
+                <div class="guide-tip">
+                    <div class="guide-tip-icon" style="background:#fef3c7;color:var(--warning)">!</div>
+                    <div>
+                        <strong>Ελέγξτε τα email σας μετά τις υποβολές</strong><br>
+                        <span style="color:var(--gray-500)">Οι περισσότεροι κατάλογοι στέλνουν email επαλήθευσης. Πρέπει να πατήσετε τον σύνδεσμο.</span>
+                    </div>
+                </div>
+                <div class="guide-tip">
+                    <div class="guide-tip-icon" style="background:#f3e8ff;color:#7c3aed">!</div>
+                    <div>
+                        <strong>Κάποιοι κατάλογοι θέλουν λογαριασμό</strong><br>
+                        <span style="color:var(--gray-500)">Bing &rarr; Microsoft account, Apple &rarr; Apple ID. Φτιάξτε τους πριν ξεκινήσετε.</span>
+                    </div>
+                </div>
+                <div class="guide-tip">
+                    <div class="guide-tip-icon" style="background:#fce4ec;color:var(--danger)">!</div>
+                    <div>
+                        <strong>Μία επιχείρηση τη φορά</strong><br>
+                        <span style="color:var(--gray-500)">Ο αυτοματισμός ανοίγει πραγματικά παράθυρα browser. Ολοκληρώστε μία επιχείρηση πριν ξεκινήσετε την επόμενη.</span>
+                    </div>
+                </div>
+                <div class="guide-tip">
+                    <div class="guide-tip-icon" style="background:#dcfce7;color:var(--success)">!</div>
+                    <div>
+                        <strong>Χρησιμοποιήστε συγκεκριμένες κατηγορίες</strong><br>
+                        <span style="color:var(--gray-500)">Π.χ. "Υδραυλικός" αντί "Υπηρεσίες". Το εργαλείο τις πληκτρολογεί για autocomplete.</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ΜΑΖΙΚΗ ΕΙΣΑΓΩΓΗ -->
+        <div class="card">
+            <h2>Μαζική εισαγωγή με CSV</h2>
+            <p style="line-height:1.8;margin-bottom:12px">
+                Για πολλές επιχειρήσεις μαζί, φτιάξτε ένα αρχείο CSV (π.χ. στο Excel/Google Sheets)
+                και κάντε κλικ στο "Εισαγωγή CSV". Το εργαλείο αναγνωρίζει πολλά ονόματα στηλών:
+            </p>
+            <div style="overflow-x:auto">
+                <table style="font-size:13px">
+                    <thead>
+                        <tr><th>Πεδίο</th><th>Αποδεκτά ονόματα στηλών</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>Επωνυμία</td><td><code>business_name</code>, <code>company_name</code>, <code>eponymia</code>, <code>name</code></td></tr>
+                        <tr><td>Διεύθυνση</td><td><code>address</code>, <code>dieuthinsi</code>, <code>street</code></td></tr>
+                        <tr><td>Πόλη</td><td><code>city</code>, <code>poli</code></td></tr>
+                        <tr><td>Τ.Κ.</td><td><code>postal_code</code>, <code>zip</code>, <code>tk</code></td></tr>
+                        <tr><td>Τηλέφωνο</td><td><code>phone</code>, <code>tilefono</code>, <code>tel</code></td></tr>
+                        <tr><td>Κινητό</td><td><code>mobile</code>, <code>kinito</code></td></tr>
+                        <tr><td>Email</td><td><code>email</code></td></tr>
+                        <tr><td>Website</td><td><code>website</code>, <code>url</code></td></tr>
+                        <tr><td>Κατηγορία</td><td><code>category</code>, <code>kategoria</code></td></tr>
+                        <tr><td>Περιγραφή</td><td><code>description_gr</code>, <code>perigrafi</code></td></tr>
+                        <tr><td>ΑΦΜ</td><td><code>tax_id</code>, <code>afm</code></td></tr>
+                        <tr><td>Νομός</td><td><code>region</code>, <code>nomos</code></td></tr>
+                        <tr><td>Ωράριο</td><td><code>hours</code>, <code>ores</code></td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- ΑΝΤΙΜΕΤΩΠΙΣΗ ΠΡΟΒΛΗΜΑΤΩΝ -->
+        <div class="card">
+            <h2>Αντιμετώπιση προβλημάτων</h2>
+            <table style="font-size:13px">
+                <thead><tr><th style="width:35%">Πρόβλημα</th><th>Λύση</th></tr></thead>
+                <tbody>
+                    <tr>
+                        <td>Δεν ανοίγει browser</td>
+                        <td>Βεβαιωθείτε ότι είναι εγκατεστημένο το Playwright: <code>python3 -m playwright install chromium</code></td>
+                    </tr>
+                    <tr>
+                        <td>Τα πεδία δεν συμπληρώνονται σωστά</td>
+                        <td>Ο κατάλογος μπορεί να άλλαξε τη σελίδα του. Τα selectors στα αρχεία automation χρειάζονται ενημέρωση.</td>
+                    </tr>
+                    <tr>
+                        <td>Ο αυτοματισμός κολλάει</td>
+                        <td>Ελέγξτε το παράθυρο browser για popups ή dialogs. Κλείστε τα χειροκίνητα και πατήστε "Συνέχεια".</td>
+                    </tr>
+                    <tr>
+                        <td>Σφάλμα "No active automation"</td>
+                        <td>Ο αυτοματισμός μπορεί να τελείωσε ή να απέτυχε. Ελέγξτε τον πίνακα προόδου.</td>
+                    </tr>
+                    <tr>
+                        <td>Το CSV δεν φορτώνει</td>
+                        <td>Βεβαιωθείτε ότι το αρχείο είναι UTF-8 και έχει header row με αναγνωρίσιμα ονόματα στηλών.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+    </div>
+
+</div>
+
+
+<script src="supabase-config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

@@ -1,5 +1,6 @@
 app/
-*.py
+run.py
 requirements.txt
 data/
 __pycache__/
+static/

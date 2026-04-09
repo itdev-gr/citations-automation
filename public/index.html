@@ -8,12 +8,37 @@
 </head>
 <body>
 
+<!-- LOGIN SCREEN -->
+<div id="loginScreen" style="display:flex;align-items:center;justify-content:center;min-height:100vh;background:#0f172a">
+    <div class="card" style="max-width:380px;width:100%;margin:20px">
+        <h2 style="text-align:center;margin-bottom:8px">Citations Automation</h2>
+        <p style="text-align:center;opacity:0.7;margin-bottom:24px;font-size:14px">Συνδεθείτε για να συνεχίσετε</p>
+        <div style="margin-bottom:16px">
+            <label style="display:block;margin-bottom:4px;font-size:13px">Email</label>
+            <input type="email" id="loginEmail" class="input" placeholder="email@example.com" style="width:100%">
+        </div>
+        <div style="margin-bottom:20px">
+            <label style="display:block;margin-bottom:4px;font-size:13px">Κωδικός</label>
+            <input type="password" id="loginPassword" class="input" placeholder="••••••••" style="width:100%"
+                onkeydown="if(event.key==='Enter')doLogin()">
+        </div>
+        <div id="loginError" style="color:#f87171;font-size:13px;margin-bottom:12px;display:none"></div>
+        <button class="btn btn-primary" style="width:100%" onclick="doLogin()">Σύνδεση</button>
+    </div>
+</div>
+
+<!-- MAIN APP (hidden until login) -->
+<div id="mainApp" style="display:none">
+
 <div class="header">
     <div>
         <h1>Citations Automation</h1>
         <div class="subtitle">Αυτόματες καταχωρήσεις σε καταλόγους για Local SEO</div>
     </div>
-    <div style="font-size:13px;opacity:0.8" id="connectionStatus">Σύνδεση...</div>
+    <div style="display:flex;align-items:center;gap:12px">
+        <div style="font-size:13px;opacity:0.8" id="connectionStatus">Σύνδεση...</div>
+        <button class="btn btn-outline" style="font-size:12px;padding:4px 12px" onclick="doLogout()">Αποσύνδεση</button>
+    </div>
 </div>
 
 <div class="tabs">
@@ -515,7 +540,77 @@
 </div>
 
 
+</div><!-- /mainApp -->
+
 <script src="supabase-config.js"></script>
 <script src="app.js"></script>
+<script>
+// Login via Supabase Auth
+async function doLogin() {
+    const email = document.getElementById('loginEmail').value.trim();
+    const pass = document.getElementById('loginPassword').value;
+    const errEl = document.getElementById('loginError');
+    errEl.style.display = 'none';
+
+    if (!email || !pass) {
+        errEl.textContent = 'Συμπληρώστε email και κωδικό';
+        errEl.style.display = 'block';
+        return;
+    }
+
+    try {
+        const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+            method: 'POST',
+            headers: {
+                'apikey': SUPABASE_ANON_KEY,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ email, password: pass }),
+        });
+        const data = await res.json();
+
+        if (data.access_token) {
+            localStorage.setItem('citations_token', data.access_token);
+            localStorage.setItem('citations_email', email);
+            showApp();
+        } else {
+            errEl.textContent = data.error_description || data.msg || 'Λάθος email ή κωδικός';
+            errEl.style.display = 'block';
+        }
+    } catch (e) {
+        errEl.textContent = 'Σφάλμα σύνδεσης. Δοκιμάστε ξανά.';
+        errEl.style.display = 'block';
+    }
+}
+
+function showApp() {
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('mainApp').style.display = 'block';
+}
+
+function doLogout() {
+    localStorage.removeItem('citations_token');
+    localStorage.removeItem('citations_email');
+    document.getElementById('mainApp').style.display = 'none';
+    document.getElementById('loginScreen').style.display = 'flex';
+}
+
+// Auto-login if token exists
+(function checkSession() {
+    const token = localStorage.getItem('citations_token');
+    if (token) {
+        // Verify token is still valid
+        fetch(`${SUPABASE_URL}/auth/v1/user`, {
+            headers: {
+                'apikey': SUPABASE_ANON_KEY,
+                'Authorization': `Bearer ${token}`,
+            },
+        }).then(r => {
+            if (r.ok) showApp();
+            else doLogout();
+        }).catch(() => doLogout());
+    }
+})();
+</script>
 </body>
 </html>

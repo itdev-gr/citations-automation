@@ -175,16 +175,16 @@
         <div class="card">
             <h2>3. Εκκίνηση</h2>
             <p style="font-size:13px;color:var(--gray-500);margin-bottom:12px">
-                Θα ανοίξει παράθυρο browser για κάθε κατάλογο. Οι φόρμες συμπληρώνονται αυτόματα.
-                Εσείς χρειάζεται μόνο να λύσετε CAPTCHA και να πατήσετε "Συνέχεια".
+                Για κάθε κατάλογο θα εμφανιστούν τα στοιχεία έτοιμα για copy.
+                Πατήστε "Άνοιγμα σελίδας" για να ανοίξει ο κατάλογος σε νέο tab, κάντε copy-paste τα πεδία, και πατήστε "Ολοκληρώθηκε".
             </p>
             <button class="btn btn-success btn-lg" onclick="startAutomation()" id="startBtn">
-                Εκκίνηση Αυτοματισμού
+                Ξεκίνημα Υποβολών
             </button>
         </div>
 
         <div class="card" id="progressCard" style="display:none">
-            <h2>Πρόοδος</h2>
+            <h2>Κατάλογοι</h2>
             <div class="progress-list" id="progressList"></div>
         </div>
     </div>
@@ -475,11 +475,6 @@
 
 </div>
 
-<!-- Μπάρα συνέχειας -->
-<div class="continue-bar" id="continueBar">
-    <span id="continueMessage">Απαιτείται ενέργεια στο παράθυρο browser...</span>
-    <button class="btn" onclick="continueAutomation()">Συνέχεια</button>
-</div>
 
 <script src="supabase-config.js"></script>
 <script src="app.js"></script>

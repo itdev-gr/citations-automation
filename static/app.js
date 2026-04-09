@@ -9,28 +9,9 @@ document.addEventListener('DOMContentLoaded', () => {
     renderDirectoryGrid();
     loadBusinesses();
     loadSubmissions();
-    checkLocalServer();
+    document.getElementById('connectionStatus').textContent = 'Online';
+    document.getElementById('connectionStatus').style.color = '#86efac';
 });
-
-// --- Check if local automation server is running ---
-let localServerAvailable = false;
-let eventSource = null;
-
-async function checkLocalServer() {
-    try {
-        const res = await fetch('http://localhost:8000/api/directories', { signal: AbortSignal.timeout(2000) });
-        if (res.ok) {
-            localServerAvailable = true;
-            document.getElementById('connectionStatus').textContent = 'Automation: Online';
-            document.getElementById('connectionStatus').style.color = '#86efac';
-            connectSSE();
-        }
-    } catch {
-        localServerAvailable = false;
-        document.getElementById('connectionStatus').textContent = 'Automation: Offline (μόνο διαχείριση)';
-        document.getElementById('connectionStatus').style.color = '#fcd34d';
-    }
-}
 
 // --- Tabs ---
 function initTabs() {
@@ -122,11 +103,7 @@ async function saveBusiness() {
 
     const id = document.getElementById('editBusinessId').value;
     if (id) {
-        await supabase('citations_businesses', {
-            method: 'PATCH',
-            filters: `id=eq.${id}`,
-            body: data,
-        });
+        await supabase('citations_businesses', { method: 'PATCH', filters: `id=eq.${id}`, body: data });
     } else {
         await supabase('citations_businesses', { method: 'POST', body: data });
     }
@@ -134,13 +111,10 @@ async function saveBusiness() {
     await loadBusinesses();
 }
 
-function editBusiness(id) {
-    showBusinessForm(id);
-}
+function editBusiness(id) { showBusinessForm(id); }
 
 async function deleteBusiness(id) {
     if (!confirm('Διαγραφή αυτής της επιχείρησης και όλων των καταχωρήσεών της;')) return;
-    // Delete submissions first, then business
     await supabase('citations_submissions', { method: 'DELETE', filters: `business_id=eq.${id}` });
     await supabase('citations_businesses', { method: 'DELETE', filters: `id=eq.${id}` });
     await loadBusinesses();
@@ -155,29 +129,23 @@ async function importCSV(input) {
     if (lines.length < 2) { alert('Το CSV είναι κενό'); return; }
 
     const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/['"]/g, '').replace(/ /g, '_'));
-
     const fieldMap = {
         business_name: 'name', company_name: 'name', eponymia: 'name', name: 'name',
         name_en: 'name_en', english_name: 'name_en',
         address: 'address', dieuthinsi: 'address', street: 'address',
-        city: 'city', poli: 'city',
-        city_en: 'city_en',
+        city: 'city', poli: 'city', city_en: 'city_en',
         postal_code: 'postal_code', zip: 'postal_code', tk: 'postal_code',
         region: 'region', nomos: 'region',
         phone: 'phone', tilefono: 'phone', tel: 'phone',
-        mobile: 'mobile', kinito: 'mobile',
-        email: 'email',
+        mobile: 'mobile', kinito: 'mobile', email: 'email',
         website: 'website', url: 'website',
-        category: 'category', kategoria: 'category',
-        category_en: 'category_en',
+        category: 'category', kategoria: 'category', category_en: 'category_en',
         description_gr: 'description_gr', perigrafi: 'description_gr',
         description_en: 'description_en',
         hours: 'hours', ores: 'hours',
         facebook: 'facebook', instagram: 'instagram', linkedin: 'linkedin',
-        tax_id: 'tax_id', afm: 'tax_id',
-        contact_person: 'contact_person',
+        tax_id: 'tax_id', afm: 'tax_id', contact_person: 'contact_person',
     };
-
     const validFields = ['name','name_en','address','city','city_en','postal_code','region',
         'phone','mobile','email','website','category','category_en','contact_person',
         'tax_id','hours','facebook','instagram','linkedin','description_gr','description_en'];
@@ -186,59 +154,45 @@ async function importCSV(input) {
     for (let i = 1; i < lines.length; i++) {
         const line = lines[i].trim();
         if (!line) continue;
-
-        // Simple CSV parsing (handles basic quoted fields)
         const values = parseCSVLine(line);
         const row = {};
         headers.forEach((h, idx) => {
             const field = fieldMap[h] || h;
-            if (validFields.includes(field)) {
-                row[field] = (values[idx] || '').trim();
-            }
+            if (validFields.includes(field)) row[field] = (values[idx] || '').trim();
         });
-
         if (row.name) {
             await supabase('citations_businesses', { method: 'POST', body: row });
             imported++;
         }
     }
-
     alert(`Εισαγωγή ${imported} επιχειρήσεων ολοκληρώθηκε`);
     input.value = '';
     await loadBusinesses();
 }
 
 function parseCSVLine(line) {
-    const result = [];
-    let current = '';
-    let inQuotes = false;
+    const result = []; let current = ''; let inQuotes = false;
     for (let i = 0; i < line.length; i++) {
         const ch = line[i];
-        if (ch === '"') { inQuotes = !inQuotes; }
+        if (ch === '"') inQuotes = !inQuotes;
         else if (ch === ',' && !inQuotes) { result.push(current); current = ''; }
-        else { current += ch; }
+        else current += ch;
     }
-    result.push(current);
-    return result;
+    result.push(current); return result;
 }
 
 function exportCSV() {
     if (!businesses.length) { alert('Δεν υπάρχουν επιχειρήσεις'); return; }
     const fields = ['name','name_en','address','city','city_en','postal_code','region',
         'phone','mobile','email','website','category','category_en',
-        'description_gr','description_en','hours','facebook','instagram',
-        'linkedin','tax_id','contact_person'];
+        'description_gr','description_en','hours','facebook','instagram','linkedin','tax_id','contact_person'];
     let csv = fields.join(',') + '\n';
     businesses.forEach(b => {
         csv += fields.map(f => `"${(b[f] || '').replace(/"/g, '""')}"`).join(',') + '\n';
     });
     const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'businesses.csv';
-    a.click();
-    URL.revokeObjectURL(url);
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+    a.download = 'businesses.csv'; a.click();
 }
 
 // --- Directories ---
@@ -255,16 +209,9 @@ function renderDirectoryGrid() {
     `).join('');
 }
 
-function selectAllDirs() {
-    document.querySelectorAll('#directoryGrid input[type="checkbox"]').forEach(cb => cb.checked = true);
-}
-function deselectAllDirs() {
-    document.querySelectorAll('#directoryGrid input[type="checkbox"]').forEach(cb => cb.checked = false);
-}
-
-function getSelectedDirs() {
-    return [...document.querySelectorAll('#directoryGrid input[type="checkbox"]:checked')].map(cb => cb.value);
-}
+function selectAllDirs() { document.querySelectorAll('#directoryGrid input[type="checkbox"]').forEach(cb => cb.checked = true); }
+function deselectAllDirs() { document.querySelectorAll('#directoryGrid input[type="checkbox"]').forEach(cb => cb.checked = false); }
+function getSelectedDirs() { return [...document.querySelectorAll('#directoryGrid input[type="checkbox"]:checked')].map(cb => cb.value); }
 
 // --- Submit tab ---
 function populateBusinessSelect() {
@@ -277,101 +224,198 @@ function populateBusinessSelect() {
 
 function onBusinessSelected() {}
 
-// Status label translations
+// Status labels
 const STATUS_LABELS = {
-    'pending': 'Εκκρεμεί',
-    'running': 'Σε εξέλιξη',
-    'waiting_human': 'Αναμονή',
-    'submitted': 'Υποβλήθηκε',
-    'success': 'Υποβλήθηκε',
-    'complete': 'Υποβλήθηκε',
-    'error': 'Σφάλμα',
+    pending: 'Εκκρεμεί', running: 'Σε εξέλιξη', waiting_human: 'Αναμονή',
+    submitted: 'Υποβλήθηκε', success: 'Υποβλήθηκε', complete: 'Υποβλήθηκε', error: 'Σφάλμα',
+};
+function statusLabel(s) { return STATUS_LABELS[s] || s; }
+
+// --- Directory registration URLs & field mappings ---
+const DIR_REG_URLS = {
+    xo_gr: 'https://www.xo.gr/dorean-katachorisi/',
+    vrisko: 'https://vriskodigital.vrisko.gr/dorean-kataxorisi/',
+    europages: 'https://www.europages.co.uk/register.html',
+    bing_places: 'https://www.bingplaces.com/',
+    foursquare: 'https://foursquare.com/add-place',
+    apple_business: 'https://businessconnect.apple.com/',
+    cybo: 'https://www.cybo.com/add-business',
+    infobel: 'https://www.infobel.com/en/greece',
 };
 
-function statusLabel(status) {
-    return STATUS_LABELS[status] || status;
-}
+// Which fields each directory needs (for the copy panel)
+const DIR_FIELDS = {
+    xo_gr: [
+        { label: 'Επωνυμία', key: 'name' },
+        { label: 'Τηλέφωνο', key: 'phone' },
+        { label: 'Κινητό', key: 'mobile' },
+        { label: 'Email', key: 'email' },
+        { label: 'Διεύθυνση', key: 'address' },
+        { label: 'Πόλη', key: 'city' },
+        { label: 'Τ.Κ.', key: 'postal_code' },
+        { label: 'Website', key: 'website' },
+        { label: 'Κατηγορία', key: 'category' },
+        { label: 'Υπεύθυνος', key: 'contact_person' },
+    ],
+    vrisko: [
+        { label: 'Επωνυμία', key: 'name' },
+        { label: 'Τηλέφωνο', key: 'phone' },
+        { label: 'Email', key: 'email' },
+        { label: 'Διεύθυνση', key: 'address' },
+        { label: 'Πόλη', key: 'city' },
+        { label: 'Τ.Κ.', key: 'postal_code' },
+        { label: 'Website', key: 'website' },
+        { label: 'Κατηγορία', key: 'category' },
+    ],
+    europages: [
+        { label: 'Company Name', key: 'name_en', fallback: 'name' },
+        { label: 'Phone', key: 'phone' },
+        { label: 'Email', key: 'email' },
+        { label: 'Address', key: 'address' },
+        { label: 'City', key: 'city_en', fallback: 'city' },
+        { label: 'Zip Code', key: 'postal_code' },
+        { label: 'Website', key: 'website' },
+        { label: 'Description', key: 'description_en', fallback: 'description_gr' },
+        { label: 'Country', key: '_static', value: 'Greece' },
+    ],
+    bing_places: [
+        { label: 'Business Name', key: 'name' },
+        { label: 'Phone', key: 'phone' },
+        { label: 'Address', key: 'address' },
+        { label: 'City', key: 'city' },
+        { label: 'Zip', key: 'postal_code' },
+        { label: 'Website', key: 'website' },
+        { label: 'Category', key: 'category_en', fallback: 'category' },
+    ],
+    foursquare: [
+        { label: 'Venue Name', key: 'name_en', fallback: 'name' },
+        { label: 'Address', key: 'address' },
+        { label: 'City', key: 'city_en', fallback: 'city' },
+        { label: 'Zip', key: 'postal_code' },
+        { label: 'Phone', key: 'phone' },
+        { label: 'Website', key: 'website' },
+        { label: 'Category', key: 'category_en', fallback: 'category' },
+    ],
+    apple_business: [
+        { label: 'Business Name', key: 'name_en', fallback: 'name' },
+        { label: 'Phone', key: 'phone' },
+        { label: 'Address', key: 'address' },
+        { label: 'City', key: 'city' },
+        { label: 'Website', key: 'website' },
+    ],
+    cybo: [
+        { label: 'Business Name', key: 'name_en', fallback: 'name' },
+        { label: 'Phone', key: 'phone' },
+        { label: 'Email', key: 'email' },
+        { label: 'Address', key: 'address' },
+        { label: 'City', key: 'city_en', fallback: 'city' },
+        { label: 'Zip', key: 'postal_code' },
+        { label: 'Website', key: 'website' },
+        { label: 'Description', key: 'description_en', fallback: 'description_gr' },
+        { label: 'Country', key: '_static', value: 'Greece' },
+    ],
+    infobel: [
+        { label: 'Business Name', key: 'name_en', fallback: 'name' },
+        { label: 'City', key: 'city_en', fallback: 'city' },
+        { label: 'Phone', key: 'phone' },
+    ],
+};
 
-async function startAutomation() {
-    if (!localServerAvailable) {
-        alert('Ο local automation server δεν τρέχει.\n\nΓια να τρέξετε automation, ανοίξτε terminal και εκτελέστε:\ncd ~/Desktop/citations && python3 run.py');
-        return;
-    }
-
+// --- Start submission workflow ---
+function startAutomation() {
     const businessId = document.getElementById('submitBusinessSelect').value;
     if (!businessId) { alert('Επιλέξτε πρώτα μια επιχείρηση'); return; }
 
     const dirs = getSelectedDirs();
     if (!dirs.length) { alert('Επιλέξτε τουλάχιστον έναν κατάλογο'); return; }
 
-    document.getElementById('startBtn').disabled = true;
-    document.getElementById('startBtn').textContent = 'Εκτελείται...';
-    document.getElementById('progressCard').style.display = 'block';
+    const biz = businesses.find(b => b.id === parseInt(businessId));
+    if (!biz) return;
 
+    document.getElementById('progressCard').style.display = 'block';
     const progressList = document.getElementById('progressList');
-    progressList.innerHTML = dirs.map(d => {
-        const dir = directories.find(x => x.id === d);
-        return `<div class="progress-item" id="progress-${d}">
-            <div class="dir-label">${dir ? dir.name : d}</div>
-            <div class="badge badge-pending">Εκκρεμεί</div>
-            <div class="message">Αναμονή...</div>
+
+    progressList.innerHTML = dirs.map(dirId => {
+        const dir = directories.find(x => x.id === dirId);
+        const dirName = dir ? dir.name : dirId;
+        const regUrl = DIR_REG_URLS[dirId] || '#';
+        const fields = DIR_FIELDS[dirId] || [];
+        const sub = submissions.find(s => s.business_id === biz.id && s.directory_id === dirId);
+        const isDone = sub && sub.status === 'submitted';
+
+        const fieldRows = fields.map(f => {
+            let val = '';
+            if (f.key === '_static') {
+                val = f.value;
+            } else {
+                val = biz[f.key] || (f.fallback ? biz[f.fallback] : '') || '';
+            }
+            if (!val) return '';
+            return `<div class="copy-row">
+                <span class="copy-label">${f.label}</span>
+                <span class="copy-value" title="${esc(val)}">${esc(val)}</span>
+                <button class="btn btn-sm btn-outline copy-btn" onclick="copyText('${esc(val).replace(/'/g, "\\'")}', this)">Copy</button>
+            </div>`;
+        }).filter(Boolean).join('');
+
+        return `<div class="dir-card ${isDone ? 'done' : ''}" id="dircard-${dirId}">
+            <div class="dir-card-header">
+                <div>
+                    <strong>${esc(dirName)}</strong>
+                    <span class="badge badge-${isDone ? 'submitted' : 'pending'}" id="badge-${dirId}">${isDone ? 'Υποβλήθηκε' : 'Εκκρεμεί'}</span>
+                </div>
+                <div class="dir-card-actions">
+                    <a href="${regUrl}" target="_blank" class="btn btn-sm btn-primary" onclick="trackOpen('${dirId}')">Άνοιγμα σελίδας &rarr;</a>
+                    <button class="btn btn-sm btn-success" onclick="markSubmitted(${biz.id}, '${dirId}')">Ολοκληρώθηκε</button>
+                </div>
+            </div>
+            <div class="copy-fields">${fieldRows}</div>
         </div>`;
     }).join('');
 
-    // Call local automation server
-    try {
-        await fetch('http://localhost:8000/api/automate', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ business_id: parseInt(businessId), directories: dirs }),
+    document.getElementById('progressCard').scrollIntoView({ behavior: 'smooth' });
+}
+
+function copyText(text, btn) {
+    navigator.clipboard.writeText(text).then(() => {
+        const orig = btn.textContent;
+        btn.textContent = 'Copied!';
+        btn.classList.add('copied');
+        setTimeout(() => { btn.textContent = orig; btn.classList.remove('copied'); }, 1200);
+    });
+}
+
+function trackOpen(dirId) {
+    const card = document.getElementById('dircard-' + dirId);
+    if (card) card.classList.add('opened');
+}
+
+async function markSubmitted(businessId, dirId) {
+    // Upsert submission in Supabase
+    const existing = await supabase('citations_submissions', {
+        filters: `business_id=eq.${businessId}&directory_id=eq.${dirId}`
+    });
+
+    if (existing && existing.length) {
+        await supabase('citations_submissions', {
+            method: 'PATCH',
+            filters: `business_id=eq.${businessId}&directory_id=eq.${dirId}`,
+            body: { status: 'submitted', notes: 'Manually submitted', submitted_at: new Date().toISOString() },
         });
-    } catch (e) {
-        alert('Σφάλμα σύνδεσης με τον local server: ' + e.message);
-        document.getElementById('startBtn').disabled = false;
-        document.getElementById('startBtn').textContent = 'Εκκίνηση Αυτοματισμού';
+    } else {
+        await supabase('citations_submissions', {
+            method: 'POST',
+            body: { business_id: businessId, directory_id: dirId, status: 'submitted', notes: 'Manually submitted', submitted_at: new Date().toISOString() },
+        });
     }
-}
 
-async function continueAutomation() {
-    try {
-        await fetch('http://localhost:8000/api/automate/continue', { method: 'POST' });
-        document.getElementById('continueBar').classList.remove('visible');
-    } catch (e) {
-        alert('Σφάλμα: ' + e.message);
-    }
-}
+    // Update UI
+    const badge = document.getElementById('badge-' + dirId);
+    if (badge) { badge.className = 'badge badge-submitted'; badge.textContent = 'Υποβλήθηκε'; }
+    const card = document.getElementById('dircard-' + dirId);
+    if (card) card.classList.add('done');
 
-// --- SSE (from local server) ---
-function connectSSE() {
-    eventSource = new EventSource('http://localhost:8000/api/events');
-    eventSource.onmessage = (e) => {
-        const data = JSON.parse(e.data);
-        if (data.status === 'connected') return;
-
-        const item = document.getElementById('progress-' + data.directory_id);
-        if (item) {
-            const cssClass = data.status === 'waiting_human' ? 'waiting' : data.status === 'error' ? 'error' : (data.status === 'success' || data.status === 'submitted') ? 'success' : 'running';
-            item.className = 'progress-item ' + cssClass;
-
-            const badge = item.querySelector('.badge');
-            const badgeClass = data.status === 'waiting_human' ? 'waiting' : data.status === 'error' ? 'error' : (data.status === 'success' || data.status === 'submitted' || data.status === 'complete') ? 'submitted' : 'running';
-            badge.className = 'badge badge-' + badgeClass;
-            badge.textContent = statusLabel(data.status);
-            item.querySelector('.message').textContent = data.message;
-        }
-
-        if (data.status === 'waiting_human') {
-            document.getElementById('continueMessage').textContent = data.message;
-            document.getElementById('continueBar').classList.add('visible');
-        }
-
-        if (data.directory_id === 'all' && data.step === 'done') {
-            document.getElementById('startBtn').disabled = false;
-            document.getElementById('startBtn').textContent = 'Εκκίνηση Αυτοματισμού';
-            document.getElementById('continueBar').classList.remove('visible');
-            loadSubmissions();
-        }
-    };
+    await loadSubmissions();
 }
 
 // --- Submissions (Supabase) ---

@@ -15,41 +15,49 @@ class BrownbookAutomation(BaseAutomation):
         await self.safe_click(page, '.cookie-accept, #accept-cookies, button:has-text("Accept")', timeout=3000)
 
         # Business name
-        await self.safe_fill(page, 'input[name="business_name"], input#business_name, input[name="name"]', business.get("name", ""))
+        await self.safe_fill(page, 'input[name="name"]', business.get("name", ""))
 
-        # Phone
-        await self.safe_fill(page, 'input[name="phone"], input#phone', business.get("phone", ""))
-
-        # Email
-        await self.safe_fill(page, 'input[name="email"], input#email', business.get("email", ""))
-
-        # Address
-        await self.safe_fill(page, 'input[name="address"], input#address, input[name="street"]', business.get("address", ""))
-
-        # City
-        await self.safe_fill(page, 'input[name="city"], input#city', business.get("city", ""))
-
-        # Postal code
-        await self.safe_fill(page, 'input[name="zip"], input[name="postal_code"], input#zip', business.get("postal_code", ""))
-
-        # Country - select Greece
-        await self.safe_select(page, 'select[name="country"], select#country', 'Greece')
-        await asyncio.sleep(0.5)
-
-        # Website
-        await self.safe_fill(page, 'input[name="website"], input#website', business.get("website", ""))
-
-        # Description
-        desc = business.get("description_en", "") or business.get("description_gr", "")
-        if desc:
-            await self.safe_fill(page, 'textarea[name="description"], textarea#description', desc)
-
-        # Category
+        # Category (combobox dropdown)
         category = business.get("category_en", "") or business.get("category", "")
         if category:
-            await self.safe_fill(page, 'input[name="category"], input#category', category)
+            await self.safe_click(page, 'button[role="combobox"]', timeout=3000)
+            await asyncio.sleep(0.5)
+            # Type to filter in the dropdown
+            await page.keyboard.type(category)
             await asyncio.sleep(1)
-            await self.safe_click(page, '.autocomplete-suggestion:first-child, .ui-menu-item:first-child', timeout=2000)
+            await page.keyboard.press("Enter")
+            await asyncio.sleep(0.5)
+
+        # Address (textarea)
+        await self.safe_fill(page, 'textarea[name="address"]', business.get("address", ""))
+
+        # City
+        await self.safe_fill(page, 'input[name="city"]', business.get("city", ""))
+
+        # Zip code
+        await self.safe_fill(page, 'input[name="zip_code"]', business.get("postal_code", ""))
+
+        # Phone
+        await self.safe_fill(page, 'input[name="phone"]', business.get("phone", ""))
+
+        # Mobile
+        await self.safe_fill(page, 'input[name="mobile"]', business.get("mobile", ""))
+
+        # Email
+        await self.safe_fill(page, 'input[name="email"]', business.get("email", ""))
+
+        # Website
+        await self.safe_fill(page, 'input[name="website"]', business.get("website", ""))
+
+        # Facebook
+        facebook = business.get("facebook", "")
+        if facebook:
+            await self.safe_fill(page, 'input[name="facebook"]', facebook)
+
+        # Instagram
+        instagram = business.get("instagram", "")
+        if instagram:
+            await self.safe_fill(page, 'input[name="instagram"]', instagram)
 
     async def submit(self, page: Page, business: dict) -> AutomationResult:
         solved = await self.try_solve_captcha(page)

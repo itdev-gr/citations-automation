@@ -252,9 +252,9 @@ const DIR_REG_URLS = {
     brownbook: 'https://www.brownbook.net/add-business/',
     storeboard: 'https://www.storeboard.com/register',
     yellowplace: 'https://yellow.place/en/add-place',
-    showmelocal: 'https://www.showmelocal.com/CreateBusiness.aspx',
+    showmelocal: 'https://www.showmelocal.com/start-submission.aspx',
     globalcatalog: 'https://www.globalcatalog.com/add-business.html',
-    twofindlocal: 'https://www.2findlocal.com/add-business',
+    twofindlocal: 'https://www.2findlocal.com/Modules/Biz/bizPhoneLookup.php',
     trustpilot: 'https://business.trustpilot.com/signup',
     citymaps: 'https://citymaps.gr/',
 };

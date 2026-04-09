@@ -6,7 +6,7 @@ import asyncio
 class ShowMeLocalAutomation(BaseAutomation):
     directory_id = "showmelocal"
     directory_name = "ShowMeLocal"
-    registration_url = "https://www.showmelocal.com/CreateBusiness.aspx"
+    registration_url = "https://www.showmelocal.com/start-submission.aspx"
 
     async def fill_form(self, page: Page, business: dict):
         await asyncio.sleep(2)

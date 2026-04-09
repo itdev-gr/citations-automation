@@ -57,8 +57,8 @@ class BaseAutomation:
 
             async with async_playwright() as p:
                 browser = await p.chromium.launch(
-                    headless=False,
-                    slow_mo=300,
+                    headless=True,
+                    slow_mo=200,
                 )
                 context = await browser.new_context(
                     viewport={"width": 1280, "height": 900},

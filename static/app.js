@@ -322,7 +322,83 @@ const DIR_FIELDS = {
 };
 
 // --- Start submission workflow ---
+let automationMode = 'manual'; // 'manual' or 'auto'
+let sseSource = null;
+
 function startAutomation() {
+    automationMode = 'manual';
+    renderSubmitCards();
+}
+
+function startAutoSubmit() {
+    automationMode = 'auto';
+    const businessId = document.getElementById('submitBusinessSelect').value;
+    if (!businessId) { alert('Επιλέξτε πρώτα μια επιχείρηση'); return; }
+    const dirs = getSelectedDirs();
+    if (!dirs.length) { alert('Επιλέξτε τουλάχιστον έναν κατάλογο'); return; }
+
+    renderSubmitCards();
+
+    // Connect SSE for live progress
+    if (sseSource) sseSource.close();
+    sseSource = new EventSource(`${AUTOMATION_API}/api/events`);
+    sseSource.onmessage = (e) => {
+        const data = JSON.parse(e.data);
+        if (data.status === 'connected') return;
+        updateProgressCard(data);
+    };
+    sseSource.onerror = () => {
+        console.warn('SSE disconnected');
+    };
+
+    // Start automation on VPS
+    fetch(`${AUTOMATION_API}/api/automate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ business_id: parseInt(businessId), directories: dirs }),
+    }).then(r => r.json()).then(data => {
+        if (data.error) alert('Σφάλμα: ' + data.error);
+    }).catch(err => {
+        alert('Δεν ήταν δυνατή η σύνδεση με τον automation server.\n\nΣφάλμα: ' + err.message);
+    });
+}
+
+function continueAutomation() {
+    fetch(`${AUTOMATION_API}/api/automate/continue`, { method: 'POST' }).catch(() => {});
+}
+
+function updateProgressCard(data) {
+    const dirId = data.directory_id;
+    const badge = document.getElementById('badge-' + dirId);
+    const card = document.getElementById('dircard-' + dirId);
+    const msgEl = document.getElementById('msg-' + dirId);
+
+    if (badge) {
+        const statusMap = { running: 'running', waiting_human: 'waiting', success: 'submitted', error: 'error', complete: 'submitted' };
+        badge.className = `badge badge-${statusMap[data.status] || 'pending'}`;
+        badge.textContent = statusLabel(data.status);
+    }
+    if (msgEl) msgEl.textContent = data.message || '';
+    if (card && (data.status === 'success' || data.status === 'complete')) card.classList.add('done');
+
+    if (data.status === 'waiting_human' && card) {
+        const actionsDiv = card.querySelector('.dir-card-actions');
+        if (actionsDiv && !actionsDiv.querySelector('.continue-btn')) {
+            const btn = document.createElement('button');
+            btn.className = 'btn btn-sm btn-primary continue-btn';
+            btn.textContent = 'Συνέχεια';
+            btn.onclick = continueAutomation;
+            actionsDiv.prepend(btn);
+        }
+    }
+
+    if (dirId === 'all' && data.step === 'done') {
+        if (sseSource) { sseSource.close(); sseSource = null; }
+        loadSubmissions();
+    }
+}
+
+function renderSubmitCards() {
     const businessId = document.getElementById('submitBusinessSelect').value;
     if (!businessId) { alert('Επιλέξτε πρώτα μια επιχείρηση'); return; }
 
@@ -358,6 +434,8 @@ function startAutomation() {
             </div>`;
         }).filter(Boolean).join('');
 
+        const autoMsg = automationMode === 'auto' ? `<div class="auto-status" id="msg-${dirId}" style="padding:8px 16px;font-size:13px;color:var(--gray-500);"></div>` : '';
+
         return `<div class="dir-card ${isDone ? 'done' : ''}" id="dircard-${dirId}">
             <div class="dir-card-header">
                 <div>
@@ -369,6 +447,7 @@ function startAutomation() {
                     <button class="btn btn-sm btn-success" onclick="markSubmitted(${biz.id}, '${dirId}')">Ολοκληρώθηκε</button>
                 </div>
             </div>
+            ${autoMsg}
             <div class="copy-fields">${fieldRows}</div>
         </div>`;
     }).join('');

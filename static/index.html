@@ -175,12 +175,17 @@
         <div class="card">
             <h2>3. Εκκίνηση</h2>
             <p style="font-size:13px;color:var(--gray-500);margin-bottom:12px">
-                Για κάθε κατάλογο θα εμφανιστούν τα στοιχεία έτοιμα για copy.
-                Πατήστε "Άνοιγμα σελίδας" για να ανοίξει ο κατάλογος σε νέο tab, κάντε copy-paste τα πεδία, και πατήστε "Ολοκληρώθηκε".
+                <strong>Αυτόματη υποβολή:</strong> Ο server ανοίγει browser και συμπληρώνει τις φόρμες αυτόματα.<br>
+                <strong>Χειροκίνητη:</strong> Εμφανίζει τα στοιχεία για copy-paste σε κάθε κατάλογο.
             </p>
-            <button class="btn btn-success btn-lg" onclick="startAutomation()" id="startBtn">
-                Ξεκίνημα Υποβολών
-            </button>
+            <div class="btn-group" style="margin:0">
+                <button class="btn btn-success btn-lg" onclick="startAutoSubmit()" id="autoBtn">
+                    Αυτόματη Υποβολή
+                </button>
+                <button class="btn btn-outline btn-lg" onclick="startAutomation()" id="startBtn">
+                    Χειροκίνητη (Copy-Paste)
+                </button>
+            </div>
         </div>
 
         <div class="card" id="progressCard" style="display:none">

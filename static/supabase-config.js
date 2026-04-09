@@ -1,3 +1,6 @@
+// VPS Automation Server
+const AUTOMATION_API = 'http://187.124.189.45:8000';
+
 // Supabase Configuration
 const SUPABASE_URL = 'https://jkbxdjuszhrnbvivsuvw.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImprYnhkanVzemhybmJ2aXZzdXZ3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU2MzkyNjQsImV4cCI6MjA5MTIxNTI2NH0.GziMKhOwRiUHlvgckD4FQgk39DHrXDKt-lY-atdjGnM';

@@ -257,6 +257,7 @@ const DIR_REG_URLS = {
     twofindlocal: 'https://www.2findlocal.com/Modules/Biz/bizPhoneLookup.php',
     trustpilot: 'https://business.trustpilot.com/signup',
     citymaps: 'https://citymaps.gr/',
+    napfinder: 'https://www.napfinder.com/add-business',
 };
 
 // Which fields each directory needs (for the copy panel)
@@ -468,6 +469,16 @@ const DIR_FIELDS = {
         { label: 'Κατηγορία', key: 'category' },
         { label: 'Περιγραφή', key: 'description_gr' },
     ],
+    napfinder: [
+        { label: 'Business Name', key: 'name_en', fallback: 'name' },
+        { label: 'Phone', key: 'phone' },
+        { label: 'Address', key: 'address' },
+        { label: 'City', key: 'city_en', fallback: 'city' },
+        { label: 'Zip', key: 'postal_code' },
+        { label: 'Website', key: 'website' },
+        { label: 'Email', key: 'email' },
+        { label: 'Country', key: '_static', value: 'Greece' },
+    ],
 };
 
 // --- Start submission workflow ---
@@ -607,6 +618,7 @@ function renderSubmitCards() {
                 </div>
                 <div class="dir-card-actions">
                     ${isDone && sub.url ? `<a href="${esc(sub.url)}" target="_blank" class="btn btn-sm btn-success listing-link">Καταχώριση &rarr;</a>` : ''}
+                    ${isDone ? `<button class="btn btn-sm btn-outline" onclick="resubmitDir(${biz.id}, '${dirId}')">Επανυποβολή</button>` : ''}
                     <a href="${regUrl}" target="_blank" class="btn btn-sm btn-primary" onclick="trackOpen('${dirId}')">Άνοιγμα σελίδας &rarr;</a>
                     <button class="btn btn-sm btn-success" onclick="markSubmitted(${biz.id}, '${dirId}')">Ολοκληρώθηκε</button>
                 </div>
@@ -617,6 +629,33 @@ function renderSubmitCards() {
     }).join('');
 
     document.getElementById('progressCard').scrollIntoView({ behavior: 'smooth' });
+}
+
+async function resubmitDir(businessId, dirId) {
+    if (!confirm(`Επανυποβολή ${dirId}; Θα γίνει εκ νέου καταχώριση.`)) return;
+
+    // Reset status to pending
+    await supabase('citations_submissions', {
+        method: 'PATCH',
+        filters: `business_id=eq.${businessId}&directory_id=eq.${dirId}`,
+        body: { status: 'pending', notes: '', url: '' },
+    });
+    await loadSubmissions();
+
+    // Run auto-submit for just this directory
+    try {
+        const res = await fetch(`${AUTOMATION_API}/api/automate`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ business_id: businessId, directories: [dirId] }),
+        });
+        if (res.ok) {
+            // Re-render to show running state
+            renderSubmitCards();
+        }
+    } catch (e) {
+        alert('Σφάλμα σύνδεσης με τον server');
+    }
 }
 
 function copyText(text, btn) {

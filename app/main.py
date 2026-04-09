@@ -31,6 +31,7 @@ from .automations.globalcatalog import GlobalCatalogAutomation
 from .automations.twofindlocal import TwoFindLocalAutomation
 from .automations.trustpilot import TrustpilotAutomation
 from .automations.citymaps import CityMapsAutomation
+from .automations.napfinder import NapFinderAutomation
 
 AUTOMATION_MAP = {
     "xo_gr": XoGrAutomation,
@@ -55,6 +56,7 @@ AUTOMATION_MAP = {
     "twofindlocal": TwoFindLocalAutomation,
     "trustpilot": TrustpilotAutomation,
     "citymaps": CityMapsAutomation,
+    "napfinder": NapFinderAutomation,
 }
 
 DIRECTORIES = [
@@ -84,6 +86,7 @@ DIRECTORIES = [
     {"id": "twofindlocal", "name": "2FindLocal", "url": "https://www.2findlocal.com", "type": "Διεθνής"},
     {"id": "trustpilot", "name": "Trustpilot", "url": "https://www.trustpilot.com", "type": "Reviews"},
     {"id": "citymaps", "name": "CityMaps.gr", "url": "https://citymaps.gr", "type": "Ελληνικός"},
+    {"id": "napfinder", "name": "NAP Finder", "url": "https://www.napfinder.com", "type": "Διεθνής"},
 ]
 
 # Global state for active automation

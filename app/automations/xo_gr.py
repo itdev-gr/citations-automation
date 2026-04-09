@@ -142,15 +142,18 @@ class XoGrAutomation(BaseAutomation):
         await self.safe_click(page, 'input#cbAcceptedInfo', timeout=2000)
 
     async def submit(self, page: Page, business: dict) -> AutomationResult:
-        # reCAPTCHA will need human intervention - pause
-        await self.pause_for_human(
-            "Χρυσός Οδηγός: Η φόρμα συμπληρώθηκε. Λύστε το CAPTCHA και πατήστε 'Συνέχεια' στο dashboard."
-        )
+        import asyncio
+
+        # Try auto-solving CAPTCHA first
+        solved = await self.try_solve_captcha(page)
+        if not solved:
+            await self.pause_for_human(
+                "Χρυσός Οδηγός: Δεν λύθηκε αυτόματα το CAPTCHA. Λύστε το χειροκίνητα και πατήστε 'Συνέχεια'."
+            )
 
         # Click submit button
         await self.safe_click(page, 'button[type="submit"], input[type="submit"], .freelisting-submit-btn, #submitBtn')
 
-        import asyncio
         await asyncio.sleep(3)
 
         return AutomationResult(

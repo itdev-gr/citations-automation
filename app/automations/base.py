@@ -168,14 +168,6 @@ class BaseAutomation:
                 await self.emit("fill", "running", "Συμπλήρωση πεδίων...")
                 await self.fill_form(page, business)
 
-                # Try auto-solving CAPTCHA
-                captcha_solved = await self.try_solve_captcha(page)
-
-                if not captcha_solved:
-                    # Wait for human to solve CAPTCHA
-                    self._human_event.clear()
-                    await self._human_event.wait()
-
                 await self.emit("submit", "running", "Υποβολή...")
                 result = await self.submit(page, business)
 

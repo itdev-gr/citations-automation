@@ -64,10 +64,12 @@ class VriskoAutomation(BaseAutomation):
         await self.safe_fill(page, '#GeneralInfoStep_ContactPersonPhone', business.get("phone", ""))
 
     async def submit(self, page: Page, business: dict) -> AutomationResult:
-        # Pause for human to review and solve CAPTCHA (next step)
-        await self.pause_for_human(
-            "Vrisko.gr: Η φόρμα συμπληρώθηκε. Ελέγξτε τα στοιχεία και πατήστε 'Συνέχεια' στο dashboard."
-        )
+        # Try auto-solving CAPTCHA before clicking next
+        solved = await self.try_solve_captcha(page)
+        if not solved:
+            await self.pause_for_human(
+                "Vrisko.gr: Δεν λύθηκε αυτόματα το CAPTCHA. Λύστε το χειροκίνητα και πατήστε 'Συνέχεια'."
+            )
 
         # Click submit/next button
         await self.safe_click(page, '#buttonNext')
@@ -75,7 +77,6 @@ class VriskoAutomation(BaseAutomation):
         await asyncio.sleep(3)
 
         # The next step might be CAPTCHA/terms acceptance
-        # Try to accept terms if visible
         try:
             terms_checkbox = page.locator('#CaptchaStep_CaptchaAcceptTermsAgreement')
             if await terms_checkbox.count() > 0:
@@ -83,10 +84,12 @@ class VriskoAutomation(BaseAutomation):
         except Exception:
             pass
 
-        # Pause again if there's a CAPTCHA step
-        await self.pause_for_human(
-            "Vrisko.gr: Αποδεχτείτε τους όρους, λύστε το CAPTCHA και πατήστε 'Συνέχεια'."
-        )
+        # Check if there's another CAPTCHA on the next step
+        solved2 = await self.try_solve_captcha(page)
+        if not solved2:
+            await self.pause_for_human(
+                "Vrisko.gr: Αποδεχτείτε τους όρους, λύστε το CAPTCHA και πατήστε 'Συνέχεια'."
+            )
 
         # Click next again for final submission
         await self.safe_click(page, '#buttonNext')

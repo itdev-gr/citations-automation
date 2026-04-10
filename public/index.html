@@ -64,6 +64,10 @@
                         <input type="file" accept=".csv" style="display:none" onchange="importCSV(this)">
                     </label>
                     <button class="btn btn-outline" onclick="exportCSV()">Εξαγωγή CSV</button>
+                    <button class="btn btn-outline" onclick="startGoogleImport()" style="background:#4285f4;color:#fff;border-color:#4285f4">
+                        <svg style="width:16px;height:16px;vertical-align:middle;margin-right:4px" viewBox="0 0 24 24"><path fill="#fff" d="M12.545 10.239v3.821h5.445c-.712 2.315-2.647 3.972-5.445 3.972a6.033 6.033 0 110-12.064c1.498 0 2.866.549 3.921 1.453l2.814-2.814A9.969 9.969 0 0012.545 2C7.021 2 2.543 6.477 2.543 12s4.478 10 10.002 10c8.396 0 10.249-7.85 9.426-11.748l-9.426-.013z"/></svg>
+                        Import από Google
+                    </button>
                 </div>
             </div>
             <div class="table-wrap">
@@ -177,6 +181,20 @@
             <div class="btn-group">
                 <button class="btn btn-primary" onclick="saveBusiness()">Αποθήκευση</button>
                 <button class="btn btn-outline" onclick="hideBusinessForm()">Ακύρωση</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Google Business Import Modal -->
+    <div id="googleImportModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center">
+        <div class="card" style="max-width:600px;width:90%;max-height:80vh;overflow-y:auto;margin:auto;position:relative">
+            <button onclick="closeGoogleImport()" style="position:absolute;top:12px;right:12px;background:none;border:none;font-size:20px;cursor:pointer;color:var(--gray-500)">&times;</button>
+            <h2>Import από Google Business Profile</h2>
+            <div id="googleImportStatus" style="margin:12px 0;font-size:13px;color:var(--gray-500)"></div>
+            <div id="googleBusinessList"></div>
+            <div id="googleImportActions" style="display:none;margin-top:16px">
+                <button class="btn btn-primary" onclick="importSelectedGoogle()">Εισαγωγή Επιλεγμένων</button>
+                <button class="btn btn-outline" onclick="closeGoogleImport()">Ακύρωση</button>
             </div>
         </div>
     </div>
@@ -616,6 +634,28 @@
                 <button class="btn btn-primary" onclick="saveEmailSettings()">Αποθήκευση</button>
             </div>
             <div id="emailStatus" style="margin-top:10px;font-size:13px"></div>
+        </div>
+
+        <div class="card">
+            <h2>Google Business Profile</h2>
+            <p style="font-size:13px;color:var(--gray-500);margin-bottom:12px">
+                Σύνδεση με Google Business Profile API για αυτόματη εισαγωγή στοιχείων επιχειρήσεων.
+                Χρειάζεται Google Cloud project με Business Profile API enabled.
+            </p>
+            <div class="form-grid" style="max-width:500px">
+                <div class="form-group">
+                    <label>Google Client ID</label>
+                    <input type="text" id="setting_google_client_id" placeholder="xxxxx.apps.googleusercontent.com">
+                </div>
+                <div class="form-group">
+                    <label>Google Client Secret</label>
+                    <input type="password" id="setting_google_client_secret" placeholder="••••••••">
+                </div>
+            </div>
+            <div class="btn-group">
+                <button class="btn btn-primary" onclick="saveGoogleSettings()">Αποθήκευση</button>
+            </div>
+            <div id="googleSettingsStatus" style="margin-top:10px;font-size:13px"></div>
         </div>
 
         <div class="card">

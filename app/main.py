@@ -3,6 +3,7 @@ import json
 import os
 import random
 import smtplib
+import httpx
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from fastapi import FastAPI
@@ -10,6 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, StreamingResponse, JSONResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from typing import Optional
 
 from .models import SubmissionRequest
 from .supabase_db import get_business, upsert_submission, get_setting, save_setting, get_submission
@@ -178,6 +180,169 @@ async def start_nap_check(req: NapCheckRequest):
 
     asyncio.create_task(run_check())
     return {"message": "NAP check started", "directories": dir_ids}
+
+
+# --- Google Business Profile Import ---
+
+class GoogleCallbackRequest(BaseModel):
+    code: str
+    redirect_uri: str
+
+class GoogleImportRequest(BaseModel):
+    access_token: str
+    locations: list[str]
+
+
+@app.post("/api/google/callback")
+async def google_callback(req: GoogleCallbackRequest):
+    """Exchange auth code for access token, then list all GBP locations."""
+    client_id = get_setting("google_client_id")
+    client_secret = get_setting("google_client_secret")
+
+    if not client_id or not client_secret:
+        return JSONResponse({"error": "Google OAuth credentials not configured"}, status_code=400)
+
+    # Exchange code for tokens
+    async with httpx.AsyncClient() as client:
+        token_res = await client.post("https://oauth2.googleapis.com/token", data={
+            "code": req.code,
+            "client_id": client_id,
+            "client_secret": client_secret,
+            "redirect_uri": req.redirect_uri,
+            "grant_type": "authorization_code",
+        })
+
+    if token_res.status_code != 200:
+        return JSONResponse({"error": f"Token exchange failed: {token_res.text}"}, status_code=400)
+
+    tokens = token_res.json()
+    access_token = tokens.get("access_token")
+    if not access_token:
+        return JSONResponse({"error": "No access token received"}, status_code=400)
+
+    # List accounts
+    businesses = []
+    async with httpx.AsyncClient() as client:
+        headers = {"Authorization": f"Bearer {access_token}"}
+
+        acct_res = await client.get(
+            "https://mybusinessaccountmanagement.googleapis.com/v1/accounts",
+            headers=headers,
+        )
+        if acct_res.status_code != 200:
+            return JSONResponse({"error": f"Failed to list accounts: {acct_res.text}"}, status_code=400)
+
+        accounts = acct_res.json().get("accounts", [])
+
+        for account in accounts:
+            account_name = account["name"]  # e.g. "accounts/123"
+
+            # List locations for this account
+            loc_res = await client.get(
+                f"https://mybusinessbusinessinformation.googleapis.com/v1/{account_name}/locations",
+                headers=headers,
+                params={"readMask": "name,title,storefrontAddress,phoneNumbers,websiteUri,categories,profile,regularHours"},
+            )
+            if loc_res.status_code != 200:
+                continue
+
+            locations = loc_res.json().get("locations", [])
+            for loc in locations:
+                addr = loc.get("storefrontAddress", {})
+                phones = loc.get("phoneNumbers", {})
+                cat = loc.get("categories", {}).get("primaryCategory", {})
+                businesses.append({
+                    "location_id": loc.get("name", ""),
+                    "title": loc.get("title", ""),
+                    "name": loc.get("title", ""),
+                    "address": ", ".join(addr.get("addressLines", [])),
+                    "city": addr.get("locality", ""),
+                    "postal_code": addr.get("postalCode", ""),
+                    "region": addr.get("administrativeArea", ""),
+                    "phone": phones.get("primaryPhone", ""),
+                    "mobile": (phones.get("additionalPhones") or [""])[0],
+                    "website": loc.get("websiteUri", ""),
+                    "category": cat.get("displayName", ""),
+                    "description": (loc.get("profile") or {}).get("description", ""),
+                    "hours": _format_gbp_hours(loc.get("regularHours", {})),
+                })
+
+    return {"access_token": access_token, "businesses": businesses}
+
+
+@app.post("/api/google/import")
+async def google_import(req: GoogleImportRequest):
+    """Fetch full location data for selected locations and upsert to Supabase."""
+    from .supabase_db import _request
+
+    imported = 0
+    async with httpx.AsyncClient() as client:
+        headers = {"Authorization": f"Bearer {req.access_token}"}
+
+        for loc_id in req.locations:
+            # Fetch full location data
+            loc_res = await client.get(
+                f"https://mybusinessbusinessinformation.googleapis.com/v1/{loc_id}",
+                headers=headers,
+                params={"readMask": "name,title,storefrontAddress,phoneNumbers,websiteUri,categories,profile,regularHours"},
+            )
+            if loc_res.status_code != 200:
+                continue
+
+            loc = loc_res.json()
+            addr = loc.get("storefrontAddress", {})
+            phones = loc.get("phoneNumbers", {})
+            cat = loc.get("categories", {}).get("primaryCategory", {})
+            description = (loc.get("profile") or {}).get("description", "")
+
+            biz_data = {
+                "name": loc.get("title", ""),
+                "name_en": loc.get("title", ""),
+                "address": ", ".join(addr.get("addressLines", [])),
+                "city": addr.get("locality", ""),
+                "city_en": addr.get("locality", ""),
+                "postal_code": addr.get("postalCode", ""),
+                "region": addr.get("administrativeArea", ""),
+                "phone": phones.get("primaryPhone", ""),
+                "mobile": (phones.get("additionalPhones") or [""])[0],
+                "website": loc.get("websiteUri", ""),
+                "category": cat.get("displayName", ""),
+                "category_en": cat.get("displayName", ""),
+                "description_gr": description,
+                "description_en": description,
+                "hours": _format_gbp_hours(loc.get("regularHours", {})),
+            }
+
+            # Remove empty values
+            biz_data = {k: v for k, v in biz_data.items() if v}
+
+            if biz_data.get("name"):
+                _request("citations_businesses", method="POST", body=biz_data)
+                imported += 1
+
+    return {"imported": imported}
+
+
+def _format_gbp_hours(regular_hours: dict) -> str:
+    """Format GBP regularHours periods into a readable string."""
+    periods = regular_hours.get("periods", [])
+    if not periods:
+        return ""
+
+    day_names = {
+        "MONDAY": "Δευ", "TUESDAY": "Τρι", "WEDNESDAY": "Τετ",
+        "THURSDAY": "Πεμ", "FRIDAY": "Παρ", "SATURDAY": "Σαβ", "SUNDAY": "Κυρ",
+    }
+    lines = []
+    for p in periods:
+        day = day_names.get(p.get("openDay", ""), p.get("openDay", ""))
+        open_time = p.get("openTime", {})
+        close_time = p.get("closeTime", {})
+        open_str = f"{open_time.get('hours', 0):02d}:{open_time.get('minutes', 0):02d}"
+        close_str = f"{close_time.get('hours', 0):02d}:{close_time.get('minutes', 0):02d}"
+        lines.append(f"{day} {open_str}-{close_str}")
+
+    return ", ".join(lines)
 
 
 # --- Automation ---

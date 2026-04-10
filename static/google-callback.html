@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="el">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google Authorization - Citations</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            display: flex; align-items: center; justify-content: center;
+            min-height: 100vh; margin: 0; background: #0f172a; color: #e2e8f0;
+        }
+        .card {
+            background: #1e293b; border-radius: 12px; padding: 32px;
+            max-width: 400px; width: 90%; text-align: center;
+        }
+        .spinner {
+            border: 3px solid #334155; border-top: 3px solid #4285f4;
+            border-radius: 50%; width: 40px; height: 40px;
+            animation: spin 1s linear infinite; margin: 16px auto;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .error { color: #f87171; margin-top: 12px; }
+        .success { color: #86efac; margin-top: 12px; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>Google Authorization</h2>
+        <div class="spinner" id="spinner"></div>
+        <p id="status">Ολοκλήρωση σύνδεσης με Google...</p>
+        <div id="message"></div>
+    </div>
+
+    <script>
+    (function() {
+        const params = new URLSearchParams(window.location.search);
+        const code = params.get('code');
+        const error = params.get('error');
+
+        if (error) {
+            document.getElementById('spinner').style.display = 'none';
+            document.getElementById('status').textContent = 'Η σύνδεση ακυρώθηκε.';
+            document.getElementById('message').className = 'error';
+            document.getElementById('message').textContent = error;
+            return;
+        }
+
+        if (code) {
+            // Send code back to parent window
+            if (window.opener) {
+                window.opener.postMessage({ type: 'google_auth_code', code: code }, '*');
+                document.getElementById('spinner').style.display = 'none';
+                document.getElementById('status').textContent = 'Επιτυχής σύνδεση!';
+                document.getElementById('message').className = 'success';
+                document.getElementById('message').textContent = 'Μπορείτε να κλείσετε αυτό το παράθυρο.';
+                setTimeout(() => window.close(), 2000);
+            } else {
+                document.getElementById('spinner').style.display = 'none';
+                document.getElementById('status').textContent = 'Ο κωδικός λήφθηκε.';
+                document.getElementById('message').className = 'success';
+                document.getElementById('message').textContent = 'Κλείστε αυτό το παράθυρο και επιστρέψτε στην εφαρμογή.';
+            }
+        } else {
+            document.getElementById('spinner').style.display = 'none';
+            document.getElementById('status').textContent = 'Σφάλμα';
+            document.getElementById('message').className = 'error';
+            document.getElementById('message').textContent = 'Δεν ελήφθη authorization code.';
+        }
+    })();
+    </script>
+</body>
+</html>

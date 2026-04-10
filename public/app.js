@@ -786,13 +786,14 @@ async function saveEmailSettings() {
 }
 
 async function loadSettings() {
-    const keys = ['twocaptcha_api_key', 'proxy_list', 'smtp_host', 'smtp_port', 'smtp_user', 'smtp_password', 'notify_email'];
+    const keys = ['twocaptcha_api_key', 'proxy_list', 'smtp_host', 'smtp_port', 'smtp_user', 'smtp_password', 'notify_email', 'google_client_id', 'google_client_secret'];
     for (const key of keys) {
         try {
             const res = await fetch(`${AUTOMATION_API}/api/settings/${key}`);
             if (res.ok) {
                 const data = await res.json();
-                const el = document.getElementById('setting_' + key.replace('twocaptcha_api_key', 'twocaptcha'));
+                const elId = key === 'twocaptcha_api_key' ? 'setting_twocaptcha' : 'setting_' + key;
+                const el = document.getElementById(elId);
                 if (el && data.value) el.value = data.value;
             }
         } catch (e) {}
@@ -939,6 +940,156 @@ function renderNapResults(results) {
     }
 
     document.getElementById('napProgress').textContent = 'Ολοκληρώθηκε';
+}
+
+// --- Google Business Profile Import ---
+let googleAccessToken = null;
+let googleBusinesses = [];
+
+async function startGoogleImport() {
+    // Load client_id from settings
+    try {
+        const res = await fetch(`${AUTOMATION_API}/api/settings/google_client_id`);
+        const data = await res.json();
+        if (!data.value) {
+            alert('Ρυθμίστε πρώτα το Google Client ID στις Ρυθμίσεις');
+            return;
+        }
+        const clientId = data.value;
+        const redirectUri = window.location.origin + '/google-callback.html';
+        const scope = 'https://www.googleapis.com/auth/business.manage';
+        const authUrl = 'https://accounts.google.com/o/oauth2/v2/auth' +
+            '?client_id=' + encodeURIComponent(clientId) +
+            '&redirect_uri=' + encodeURIComponent(redirectUri) +
+            '&response_type=code' +
+            '&scope=' + encodeURIComponent(scope) +
+            '&access_type=offline' +
+            '&prompt=consent';
+
+        // Open popup
+        const popup = window.open(authUrl, 'googleAuth', 'width=600,height=700');
+
+        // Listen for message from callback page
+        window.addEventListener('message', async function handler(e) {
+            if (e.data && e.data.type === 'google_auth_code') {
+                window.removeEventListener('message', handler);
+                if (popup) popup.close();
+                await handleGoogleCallback(e.data.code);
+            }
+        });
+    } catch (e) {
+        alert('Σφάλμα: Δεν ήταν δυνατή η σύνδεση με τον server');
+    }
+}
+
+async function handleGoogleCallback(code) {
+    const modal = document.getElementById('googleImportModal');
+    modal.style.display = 'flex';
+    document.getElementById('googleImportStatus').textContent = 'Ανταλλαγή κωδικού με Google...';
+    document.getElementById('googleBusinessList').innerHTML = '';
+    document.getElementById('googleImportActions').style.display = 'none';
+
+    try {
+        const redirectUri = window.location.origin + '/google-callback.html';
+        const res = await fetch(`${AUTOMATION_API}/api/google/callback`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code, redirect_uri: redirectUri }),
+        });
+        const data = await res.json();
+
+        if (data.error) {
+            document.getElementById('googleImportStatus').textContent = 'Σφάλμα: ' + data.error;
+            return;
+        }
+
+        googleAccessToken = data.access_token;
+        googleBusinesses = data.businesses || [];
+        showGoogleBusinesses(googleBusinesses);
+    } catch (e) {
+        document.getElementById('googleImportStatus').textContent = 'Σφάλμα σύνδεσης: ' + e.message;
+    }
+}
+
+function showGoogleBusinesses(businesses) {
+    const container = document.getElementById('googleBusinessList');
+
+    if (!businesses.length) {
+        document.getElementById('googleImportStatus').textContent = 'Δεν βρέθηκαν επιχειρήσεις στο Google Business Profile.';
+        container.innerHTML = '';
+        return;
+    }
+
+    document.getElementById('googleImportStatus').textContent = `Βρέθηκαν ${businesses.length} επιχειρήσεις. Επιλέξτε αυτές που θέλετε να εισάγετε:`;
+    document.getElementById('googleImportActions').style.display = 'block';
+
+    container.innerHTML = businesses.map((b, i) => `
+        <label style="display:flex;align-items:flex-start;gap:10px;padding:10px;border:1px solid var(--gray-200);border-radius:6px;margin-bottom:8px;cursor:pointer">
+            <input type="checkbox" checked value="${i}" style="margin-top:3px">
+            <div>
+                <strong>${esc(b.title || b.name || 'Χωρίς όνομα')}</strong>
+                <div style="font-size:13px;color:var(--gray-500)">
+                    ${esc(b.address || '')}${b.city ? ', ' + esc(b.city) : ''}
+                    ${b.phone ? ' &bull; ' + esc(b.phone) : ''}
+                    ${b.category ? ' &bull; ' + esc(b.category) : ''}
+                </div>
+            </div>
+        </label>
+    `).join('');
+}
+
+async function importSelectedGoogle() {
+    const checkboxes = document.querySelectorAll('#googleBusinessList input[type="checkbox"]:checked');
+    const selectedIds = [...checkboxes].map(cb => googleBusinesses[parseInt(cb.value)].location_id).filter(Boolean);
+
+    if (!selectedIds.length) {
+        alert('Επιλέξτε τουλάχιστον μία επιχείρηση');
+        return;
+    }
+
+    document.getElementById('googleImportStatus').textContent = 'Εισαγωγή επιλεγμένων...';
+
+    try {
+        const res = await fetch(`${AUTOMATION_API}/api/google/import`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ access_token: googleAccessToken, locations: selectedIds }),
+        });
+        const data = await res.json();
+
+        if (data.error) {
+            document.getElementById('googleImportStatus').textContent = 'Σφάλμα: ' + data.error;
+            return;
+        }
+
+        alert(`Εισαγωγή ${data.imported} επιχειρήσεων ολοκληρώθηκε!`);
+        closeGoogleImport();
+        await loadBusinesses();
+    } catch (e) {
+        document.getElementById('googleImportStatus').textContent = 'Σφάλμα: ' + e.message;
+    }
+}
+
+function closeGoogleImport() {
+    document.getElementById('googleImportModal').style.display = 'none';
+    googleAccessToken = null;
+    googleBusinesses = [];
+}
+
+async function saveGoogleSettings() {
+    const fields = ['google_client_id', 'google_client_secret'];
+    for (const f of fields) {
+        const val = document.getElementById('setting_' + f).value.trim();
+        await fetch(`${AUTOMATION_API}/api/settings`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ key: f, value: val }),
+        });
+    }
+    const el = document.getElementById('googleSettingsStatus');
+    el.textContent = 'Ρυθμίσεις Google αποθηκεύτηκαν!';
+    el.style.color = 'var(--success)';
+    setTimeout(() => el.textContent = '', 3000);
 }
 
 // --- Helpers ---

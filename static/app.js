@@ -53,12 +53,22 @@ function renderBusinessList() {
     tbody.innerHTML = businesses.map(b => {
         const subs = submissions.filter(s => s.business_id === b.id);
         const submitted = subs.filter(s => s.status === 'submitted').length;
+        const errors = subs.filter(s => s.status === 'error').length;
+        const already = subs.filter(s => s.status === 'already_listed').length;
+        const done = submitted + already;
+        const pending = directories.length - done - errors;
+        const statusHtml = `<span style="cursor:pointer" onclick="document.querySelector('[data-tab=status]').click()" title="Προβολή λεπτομερειών">`
+            + (done ? `<span class="badge badge-submitted" style="margin-right:2px">${done}</span>` : '')
+            + (pending > 0 ? `<span class="badge badge-pending" style="margin-right:2px">${pending}</span>` : '')
+            + (errors ? `<span class="badge badge-error">${errors}</span>` : '')
+            + (!subs.length ? `<span class="badge badge-pending">0/${directories.length}</span>` : '')
+            + `</span>`;
         return `<tr>
             <td><strong>${esc(b.name)}</strong></td>
             <td>${esc(b.city || '')}</td>
             <td>${esc(b.phone || '')}</td>
             <td>${esc(b.category || '')}</td>
-            <td><span class="badge badge-${submitted > 0 ? 'submitted' : 'pending'}">${submitted}/${directories.length}</span></td>
+            <td>${statusHtml}</td>
             <td>
                 <button class="btn btn-sm btn-outline" onclick="editBusiness(${b.id})">Επεξεργασία</button>
                 <button class="btn btn-sm btn-danger" onclick="deleteBusiness(${b.id})">Διαγραφή</button>
@@ -749,14 +759,32 @@ async function loadStatusMatrix() {
     await loadSubmissions();
     const table = document.getElementById('statusMatrix');
     const empty = document.getElementById('emptyStatus');
+    const dashboard = document.getElementById('statusDashboard');
 
     if (!businesses.length || !submissions.length) {
         table.style.display = 'none';
         empty.style.display = 'block';
+        if (dashboard) dashboard.style.display = 'none';
         return;
     }
     table.style.display = 'table';
     empty.style.display = 'none';
+
+    // Dashboard stats
+    if (dashboard) {
+        dashboard.style.display = 'block';
+        const totalSlots = businesses.length * directories.length;
+        const totalSubmitted = submissions.filter(s => s.status === 'submitted' || s.status === 'already_listed').length;
+        const totalErrors = submissions.filter(s => s.status === 'error').length;
+        const totalPending = totalSlots - totalSubmitted - totalErrors;
+        const pct = totalSlots ? Math.round(totalSubmitted / totalSlots * 100) : 0;
+        document.getElementById('dashTotal').textContent = businesses.length;
+        document.getElementById('dashSubmitted').textContent = totalSubmitted;
+        document.getElementById('dashPending').textContent = totalPending;
+        document.getElementById('dashErrors').textContent = totalErrors;
+        document.getElementById('dashProgressBar').style.width = pct + '%';
+        document.getElementById('dashProgressPct').textContent = pct + '%';
+    }
 
     const thead = table.querySelector('thead tr');
     thead.innerHTML = '<th>Επιχείρηση</th>' + directories.map(d => `<th title="${d.name}">${d.id.replace('_', ' ')}</th>`).join('');
@@ -767,10 +795,15 @@ async function loadStatusMatrix() {
             const sub = submissions.find(s => s.business_id === b.id && s.directory_id === d.id);
             const status = sub ? sub.status : 'pending';
             const url = sub && sub.url ? sub.url : '';
-            if (url && status === 'submitted') {
-                return `<td><a href="${esc(url)}" target="_blank" class="badge badge-${status}" style="text-decoration:none;cursor:pointer" title="Άνοιγμα καταχώρισης">${statusLabel(status)} ↗</a></td>`;
+            const notes = sub && sub.notes ? sub.notes : '';
+            const tooltip = notes ? ` title="${esc(notes)}"` : '';
+            if (status === 'submitted' || status === 'already_listed') {
+                const linkUrl = url || DIR_REG_URLS[d.id] || '';
+                if (linkUrl) {
+                    return `<td><a href="${esc(linkUrl)}" target="_blank" class="badge badge-${status}" style="text-decoration:none;cursor:pointer"${tooltip}>${statusLabel(status)} ↗</a></td>`;
+                }
             }
-            return `<td><span class="badge badge-${status}">${statusLabel(status)}</span></td>`;
+            return `<td><span class="badge badge-${status}"${tooltip}>${statusLabel(status)}</span></td>`;
         }).join('');
         return `<tr><td><strong>${esc(b.name)}</strong></td>${cells}</tr>`;
     }).join('');

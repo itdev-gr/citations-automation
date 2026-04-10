@@ -244,6 +244,36 @@
 
     <!-- ΚΑΤΑΣΤΑΣΗ -->
     <div class="tab-content" id="tab-status">
+        <div id="statusDashboard" style="display:none;margin-bottom:16px">
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px">
+                <div class="card" style="margin:0;text-align:center;padding:16px">
+                    <div style="font-size:28px;font-weight:700" id="dashTotal">0</div>
+                    <div style="font-size:12px;color:var(--gray-500)">Επιχειρήσεις</div>
+                </div>
+                <div class="card" style="margin:0;text-align:center;padding:16px">
+                    <div style="font-size:28px;font-weight:700;color:var(--success)" id="dashSubmitted">0</div>
+                    <div style="font-size:12px;color:var(--gray-500)">Καταχωρήσεις</div>
+                </div>
+                <div class="card" style="margin:0;text-align:center;padding:16px">
+                    <div style="font-size:28px;font-weight:700;color:var(--warning)" id="dashPending">0</div>
+                    <div style="font-size:12px;color:var(--gray-500)">Εκκρεμείς</div>
+                </div>
+                <div class="card" style="margin:0;text-align:center;padding:16px">
+                    <div style="font-size:28px;font-weight:700;color:var(--danger)" id="dashErrors">0</div>
+                    <div style="font-size:12px;color:var(--gray-500)">Σφάλματα</div>
+                </div>
+            </div>
+            <div class="card" style="margin:0;padding:12px 16px">
+                <div style="display:flex;align-items:center;gap:12px">
+                    <span style="font-size:13px;font-weight:500;white-space:nowrap">Ολοκλήρωση:</span>
+                    <div style="flex:1;background:var(--gray-200);border-radius:8px;height:12px;overflow:hidden">
+                        <div id="dashProgressBar" style="height:100%;background:var(--success);border-radius:8px;transition:width 0.3s;width:0%"></div>
+                    </div>
+                    <span style="font-size:13px;font-weight:600;white-space:nowrap" id="dashProgressPct">0%</span>
+                </div>
+            </div>
+        </div>
+
         <div class="card">
             <h2>Πίνακας Καταχωρήσεων</h2>
             <div class="table-wrap">

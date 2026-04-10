@@ -7,6 +7,7 @@ class FoursquareAutomation(BaseAutomation):
     directory_id = "foursquare"
     directory_name = "Foursquare"
     registration_url = "https://foursquare.com/add-place"
+    search_url = "https://foursquare.com/explore?near={city}&q={name}"
 
     async def fill_form(self, page: Page, business: dict):
         # Foursquare redirects to login

@@ -68,6 +68,13 @@ def upsert_submission(business_id: int, directory_id: str, status: str, notes: s
         _request("citations_submissions", method="POST", body=body)
 
 
+def get_submission(business_id: int, directory_id: str):
+    """Get a submission record."""
+    result = _request("citations_submissions",
+                      filters=f"business_id=eq.{business_id}&directory_id=eq.{directory_id}")
+    return result[0] if result else None
+
+
 def get_setting(key: str) -> str:
     """Get a setting value from citations_settings."""
     result = _request("citations_settings", filters=f"key=eq.{key}")

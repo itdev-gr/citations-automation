@@ -12,6 +12,7 @@ class AutomationResult:
     directory_id: str
     message: str
     url: str = ""
+    screenshot: str = ""
 
 
 @dataclass
@@ -139,20 +140,60 @@ class BaseAutomation:
                 "Δεν μπόρεσα να λύσω το CAPTCHA αυτόματα. Λύστε το χειροκίνητα και πατήστε 'Συνέχεια'.")
             return False
 
-    async def run(self, business: dict) -> AutomationResult:
+    # Search URL template for duplicate checking — override in subclass
+    # Use {name} and {city} placeholders, e.g. "https://example.com/search?q={name}+{city}"
+    search_url: str = ""
+
+    async def check_duplicate(self, page: Page, business: dict) -> Optional[str]:
+        """Check if business already exists on this directory.
+        Returns the listing URL if found, None otherwise.
+        Override in subclass for directory-specific search logic."""
+        if not self.search_url:
+            return None
+
+        name = business.get("name_en") or business.get("name", "")
+        city = business.get("city_en") or business.get("city", "")
+
+        from urllib.parse import quote_plus
+        url = self.search_url.replace("{name}", quote_plus(name)).replace("{city}", quote_plus(city))
+
+        try:
+            await page.goto(url, wait_until="domcontentloaded", timeout=15000)
+            await asyncio.sleep(2)
+
+            # Look for the business name in search results
+            found = await page.evaluate(f"""
+                () => {{
+                    const name = "{name.replace('"', '\\"').lower()}";
+                    const links = document.querySelectorAll('a');
+                    for (const link of links) {{
+                        if (link.textContent.toLowerCase().includes(name) && link.href) {{
+                            return link.href;
+                        }}
+                    }}
+                    return null;
+                }}
+            """)
+            return found
+        except Exception:
+            return None
+
+    async def run(self, business: dict, proxy: str = None) -> AutomationResult:
         """Run the full automation flow for a business."""
         try:
             await self.emit("start", "running", f"Εκκίνηση {self.directory_name}...")
 
+            launch_args = [
+                '--no-sandbox',
+                '--disable-blink-features=AutomationControlled',
+                '--disable-dev-shm-usage',
+            ]
+            launch_opts = {"headless": True, "args": launch_args}
+            if proxy:
+                launch_opts["proxy"] = {"server": proxy}
+
             async with async_playwright() as p:
-                browser = await p.chromium.launch(
-                    headless=True,
-                    args=[
-                        '--no-sandbox',
-                        '--disable-blink-features=AutomationControlled',
-                        '--disable-dev-shm-usage',
-                    ],
-                )
+                browser = await p.chromium.launch(**launch_opts)
                 context = await browser.new_context(
                     viewport={"width": 1366, "height": 768},
                     locale="el-GR",
@@ -162,6 +203,19 @@ class BaseAutomation:
                 stealth = Stealth()
                 await stealth.apply_stealth_async(page)
 
+                # --- Duplicate check ---
+                await self.emit("check", "running", "Έλεγχος αν υπάρχει ήδη...")
+                existing_url = await self.check_duplicate(page, business)
+                if existing_url:
+                    await browser.close()
+                    await self.emit("done", "already_listed", f"Η επιχείρηση υπάρχει ήδη: {existing_url}")
+                    return AutomationResult(
+                        success=True,
+                        directory_id=self.directory_id,
+                        message=f"Υπάρχει ήδη στον κατάλογο.",
+                        url=existing_url,
+                    )
+
                 await self.emit("navigate", "running", f"Άνοιγμα {self.registration_url}...")
                 await page.goto(self.registration_url, wait_until="domcontentloaded", timeout=30000)
 
@@ -170,6 +224,11 @@ class BaseAutomation:
 
                 await self.emit("submit", "running", "Υποβολή...")
                 result = await self.submit(page, business)
+
+                # --- Screenshot proof ---
+                screenshot_path = await self._take_screenshot(page, business)
+                if screenshot_path:
+                    result.screenshot = screenshot_path
 
                 await asyncio.sleep(3)
                 await browser.close()
@@ -185,6 +244,18 @@ class BaseAutomation:
                 directory_id=self.directory_id,
                 message=error_msg,
             )
+
+    async def _take_screenshot(self, page: Page, business: dict) -> str:
+        """Take a screenshot as proof of submission."""
+        try:
+            os.makedirs("/opt/citations/screenshots", exist_ok=True)
+            biz_name = (business.get("name", "unknown")).replace(" ", "_").replace("/", "_")[:30]
+            filename = f"{self.directory_id}_{biz_name}_{int(asyncio.get_event_loop().time())}.png"
+            path = f"/opt/citations/screenshots/{filename}"
+            await page.screenshot(path=path, full_page=True)
+            return filename
+        except Exception:
+            return ""
 
     async def fill_form(self, page: Page, business: dict):
         """Override in subclass to fill directory-specific form."""

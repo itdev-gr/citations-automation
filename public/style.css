@@ -151,6 +151,7 @@ tr:hover td { background: var(--gray-50); }
 .badge-running { background: #dbeafe; color: var(--primary); }
 .badge-submitted { background: #dcfce7; color: var(--success); }
 .badge-error { background: #fee2e2; color: var(--danger); }
+.badge-already_listed { background: #e0e7ff; color: #4338ca; }
 .badge-waiting { background: #fef3c7; color: var(--warning); }
 
 /* Directory checkboxes */

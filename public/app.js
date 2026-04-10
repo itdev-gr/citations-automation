@@ -229,7 +229,8 @@ function onBusinessSelected() {}
 // Status labels
 const STATUS_LABELS = {
     pending: 'Εκκρεμεί', running: 'Σε εξέλιξη', waiting_human: 'Αναμονή',
-    submitted: 'Υποβλήθηκε', success: 'Υποβλήθηκε', complete: 'Υποβλήθηκε', error: 'Σφάλμα',
+    submitted: 'Υποβλήθηκε', success: 'Υποβλήθηκε', complete: 'Υποβλήθηκε',
+    already_listed: 'Υπάρχει ήδη', error: 'Σφάλμα',
 };
 function statusLabel(s) { return STATUS_LABELS[s] || s; }
 
@@ -534,24 +535,31 @@ function updateProgressCard(data) {
     const msgEl = document.getElementById('msg-' + dirId);
 
     if (badge) {
-        const statusMap = { running: 'running', waiting_human: 'waiting', success: 'submitted', error: 'error', complete: 'submitted' };
+        const statusMap = { running: 'running', waiting_human: 'waiting', success: 'submitted', error: 'error', complete: 'submitted', already_listed: 'already_listed' };
         badge.className = `badge badge-${statusMap[data.status] || 'pending'}`;
         badge.textContent = statusLabel(data.status);
     }
     if (msgEl) msgEl.textContent = data.message || '';
-    if (card && (data.status === 'success' || data.status === 'complete')) {
+    if (card && (data.status === 'success' || data.status === 'complete' || data.status === 'already_listed')) {
         card.classList.add('done');
+        const actionsDiv = card.querySelector('.dir-card-actions');
         // Add listing link if URL available
-        if (data.url) {
-            const actionsDiv = card.querySelector('.dir-card-actions');
-            if (actionsDiv && !actionsDiv.querySelector('.listing-link')) {
-                const link = document.createElement('a');
-                link.href = data.url;
-                link.target = '_blank';
-                link.className = 'btn btn-sm btn-success listing-link';
-                link.innerHTML = 'Δείτε την καταχώριση &rarr;';
-                actionsDiv.prepend(link);
-            }
+        if (data.url && actionsDiv && !actionsDiv.querySelector('.listing-link')) {
+            const link = document.createElement('a');
+            link.href = data.url;
+            link.target = '_blank';
+            link.className = 'btn btn-sm btn-success listing-link';
+            link.innerHTML = 'Καταχώριση &rarr;';
+            actionsDiv.prepend(link);
+        }
+        // Add screenshot link if available
+        if (data.screenshot && actionsDiv && !actionsDiv.querySelector('.screenshot-link')) {
+            const slink = document.createElement('a');
+            slink.href = `${AUTOMATION_API}/api/screenshots/${data.screenshot}`;
+            slink.target = '_blank';
+            slink.className = 'btn btn-sm btn-outline screenshot-link';
+            slink.textContent = 'Screenshot';
+            actionsDiv.prepend(slink);
         }
     }
 
@@ -739,33 +747,71 @@ async function loadStatusMatrix() {
 }
 
 // --- Settings ---
-async function saveCaptchaKey() {
-    const key = document.getElementById('setting_twocaptcha').value.trim();
-    if (!key) { alert('Εισάγετε το API key'); return; }
+async function saveSetting(key, elementId, statusId) {
+    const val = document.getElementById(elementId).value.trim();
     try {
         const res = await fetch(`${AUTOMATION_API}/api/settings`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ key: 'twocaptcha_api_key', value: key }),
+            body: JSON.stringify({ key, value: val }),
         });
-        if (res.ok) {
-            document.getElementById('captchaStatus').textContent = 'API key αποθηκεύτηκε!';
-            document.getElementById('captchaStatus').style.color = 'var(--success)';
+        if (res.ok && statusId) {
+            const el = document.getElementById(statusId);
+            el.textContent = 'Αποθηκεύτηκε!';
+            el.style.color = 'var(--success)';
+            setTimeout(() => el.textContent = '', 3000);
         }
     } catch (e) {
-        document.getElementById('captchaStatus').textContent = 'Σφάλμα σύνδεσης με τον server';
-        document.getElementById('captchaStatus').style.color = 'var(--danger)';
+        if (statusId) {
+            const el = document.getElementById(statusId);
+            el.textContent = 'Σφάλμα σύνδεσης';
+            el.style.color = 'var(--danger)';
+        }
     }
 }
 
+async function saveCaptchaKey() {
+    await saveSetting('twocaptcha_api_key', 'setting_twocaptcha', 'captchaStatus');
+}
+
+async function saveProxyList() {
+    await saveSetting('proxy_list', 'setting_proxies', 'proxyStatus');
+}
+
+async function saveEmailSettings() {
+    const fields = ['smtp_host', 'smtp_port', 'smtp_user', 'smtp_password', 'notify_email'];
+    for (const f of fields) {
+        const val = document.getElementById('setting_' + f).value.trim();
+        await fetch(`${AUTOMATION_API}/api/settings`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ key: f, value: val }),
+        });
+    }
+    const el = document.getElementById('emailStatus');
+    el.textContent = 'Ρυθμίσεις email αποθηκεύτηκαν!';
+    el.style.color = 'var(--success)';
+    setTimeout(() => el.textContent = '', 3000);
+}
+
 async function loadSettings() {
-    try {
-        const res = await fetch(`${AUTOMATION_API}/api/settings/twocaptcha_api_key`);
-        if (res.ok) {
-            const data = await res.json();
-            if (data.value) document.getElementById('setting_twocaptcha').value = data.value;
-        }
-    } catch (e) {}
+    const keys = ['twocaptcha_api_key', 'proxy_list', 'smtp_host', 'smtp_port', 'smtp_user', 'smtp_password', 'notify_email'];
+    for (const key of keys) {
+        try {
+            const res = await fetch(`${AUTOMATION_API}/api/settings/${key}`);
+            if (res.ok) {
+                const data = await res.json();
+                const el = document.getElementById('setting_' + key.replace('twocaptcha_api_key', 'twocaptcha'));
+                if (el && data.value) el.value = data.value;
+            }
+        } catch (e) {}
+    }
+}
+
+function exportReport() {
+    const businessId = document.getElementById('submitBusinessSelect').value;
+    if (!businessId) { alert('Επιλέξτε πρώτα μια επιχείρηση'); return; }
+    window.open(`${AUTOMATION_API}/api/report/${businessId}`, '_blank');
 }
 
 async function checkServerStatus() {

@@ -7,6 +7,7 @@ class TupaloAutomation(BaseAutomation):
     directory_id = "tupalo"
     directory_name = "Tupalo"
     registration_url = "https://www.tupalo.co/spot/new"
+    search_url = "https://www.tupalo.co/search?q={name}&where={city}"
 
     async def fill_form(self, page: Page, business: dict):
         await asyncio.sleep(2)

@@ -7,6 +7,7 @@ class BrownbookAutomation(BaseAutomation):
     directory_id = "brownbook"
     directory_name = "Brownbook.net"
     registration_url = "https://www.brownbook.net/add-business/"
+    search_url = "https://www.brownbook.net/businesses/{name}+{city}/"
 
     async def fill_form(self, page: Page, business: dict):
         await asyncio.sleep(2)

@@ -211,6 +211,9 @@
                 <button class="btn btn-outline btn-lg" onclick="startAutomation()" id="startBtn">
                     Χειροκίνητη (Copy-Paste)
                 </button>
+                <button class="btn btn-outline btn-lg" onclick="exportReport()">
+                    Εξαγωγή Report (CSV)
+                </button>
             </div>
         </div>
 
@@ -523,6 +526,54 @@
                 <button class="btn btn-primary" onclick="saveCaptchaKey()">Αποθήκευση</button>
             </div>
             <div id="captchaStatus" style="margin-top:10px;font-size:13px;color:var(--gray-500)"></div>
+        </div>
+
+        <div class="card">
+            <h2>Proxies</h2>
+            <p style="font-size:13px;color:var(--gray-500);margin-bottom:12px">
+                Λίστα proxy servers (ένα ανά γραμμή, format: <code>http://user:pass@host:port</code>).
+                Χρησιμοποιούνται τυχαία σε κάθε κατάλογο για αποφυγή blocks.
+            </p>
+            <div class="form-group" style="max-width:500px">
+                <textarea id="setting_proxies" rows="4" placeholder="http://user:pass@proxy1.com:8080&#10;http://user:pass@proxy2.com:8080"></textarea>
+            </div>
+            <div class="btn-group">
+                <button class="btn btn-primary" onclick="saveProxyList()">Αποθήκευση</button>
+            </div>
+            <div id="proxyStatus" style="margin-top:10px;font-size:13px"></div>
+        </div>
+
+        <div class="card">
+            <h2>Email Ειδοποιήσεις</h2>
+            <p style="font-size:13px;color:var(--gray-500);margin-bottom:12px">
+                Αποστολή email όταν ολοκληρωθούν όλες οι υποβολές μιας επιχείρησης.
+            </p>
+            <div class="form-grid" style="max-width:500px">
+                <div class="form-group">
+                    <label>SMTP Host</label>
+                    <input type="text" id="setting_smtp_host" placeholder="smtp.gmail.com">
+                </div>
+                <div class="form-group">
+                    <label>SMTP Port</label>
+                    <input type="text" id="setting_smtp_port" placeholder="587">
+                </div>
+                <div class="form-group">
+                    <label>SMTP User</label>
+                    <input type="text" id="setting_smtp_user" placeholder="email@example.com">
+                </div>
+                <div class="form-group">
+                    <label>SMTP Password</label>
+                    <input type="password" id="setting_smtp_password" placeholder="••••••••">
+                </div>
+                <div class="form-group full">
+                    <label>Email Ειδοποίησης</label>
+                    <input type="email" id="setting_notify_email" placeholder="notify@example.com">
+                </div>
+            </div>
+            <div class="btn-group">
+                <button class="btn btn-primary" onclick="saveEmailSettings()">Αποθήκευση</button>
+            </div>
+            <div id="emailStatus" style="margin-top:10px;font-size:13px"></div>
         </div>
 
         <div class="card">

@@ -7,6 +7,7 @@ class YellowPlaceAutomation(BaseAutomation):
     directory_id = "yellowplace"
     directory_name = "Yellow.Place"
     registration_url = "https://yellow.place/en/add-place"
+    search_url = "https://yellow.place/en/search?q={name}&location={city}"
 
     async def fill_form(self, page: Page, business: dict):
         await asyncio.sleep(2)

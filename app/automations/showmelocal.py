@@ -7,6 +7,7 @@ class ShowMeLocalAutomation(BaseAutomation):
     directory_id = "showmelocal"
     directory_name = "ShowMeLocal"
     registration_url = "https://www.showmelocal.com/start-submission.aspx"
+    search_url = "https://www.showmelocal.com/search?q={name}&loc={city}"
 
     async def fill_form(self, page: Page, business: dict):
         await asyncio.sleep(2)

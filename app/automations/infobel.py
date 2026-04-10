@@ -7,6 +7,7 @@ class InfobelAutomation(BaseAutomation):
     directory_id = "infobel"
     directory_name = "Infobel"
     registration_url = "https://www.infobelpro.com/en/promote-products/list-my-business"
+    search_url = "https://www.infobel.com/en/greece/{name}/{city}"
 
     async def fill_form(self, page: Page, business: dict):
         # InfobelPRO is the business listing page

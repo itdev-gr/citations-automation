@@ -7,6 +7,7 @@ class GlobalCatalogAutomation(BaseAutomation):
     directory_id = "globalcatalog"
     directory_name = "GlobalCatalog"
     registration_url = "https://www.globalcatalog.com/add-business.html"
+    search_url = "https://www.globalcatalog.com/search.aspx?q={name}+{city}"
 
     async def fill_form(self, page: Page, business: dict):
         await asyncio.sleep(2)

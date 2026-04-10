@@ -7,6 +7,7 @@ class CyboAutomation(BaseAutomation):
     directory_id = "cybo"
     directory_name = "Cybo"
     registration_url = "https://www.cybo.com/add-business"
+    search_url = "https://www.cybo.com/search/?q={name}+{city}&loc=Greece"
 
     async def fill_form(self, page: Page, business: dict):
         # Cybo redirects to login page first

@@ -7,6 +7,7 @@ class TrustpilotAutomation(BaseAutomation):
     directory_id = "trustpilot"
     directory_name = "Trustpilot"
     registration_url = "https://business.trustpilot.com/signup"
+    search_url = "https://www.trustpilot.com/search?query={name}"
 
     async def fill_form(self, page: Page, business: dict):
         await asyncio.sleep(2)

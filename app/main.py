@@ -1,14 +1,18 @@
 import asyncio
 import json
 import os
+import random
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse, StreamingResponse, JSONResponse
+from fastapi.responses import HTMLResponse, StreamingResponse, JSONResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from .models import SubmissionRequest
-from .supabase_db import get_business, upsert_submission, get_setting, save_setting
+from .supabase_db import get_business, upsert_submission, get_setting, save_setting, get_submission
 from .automations.xo_gr import XoGrAutomation
 from .automations.vrisko import VriskoAutomation
 from .automations.vres import VresAutomation
@@ -149,8 +153,27 @@ async def start_automation(req: SubmissionRequest):
 
     async def run_all():
         global active_automation
+
+        # Load proxies from settings
+        proxy_list_raw = get_setting("proxy_list") or ""
+        proxies = [p.strip() for p in proxy_list_raw.split("\n") if p.strip()]
+
+        results_summary = []
+
         for dir_id in req.directories:
             if dir_id not in AUTOMATION_MAP:
+                continue
+
+            # Internal duplicate check — skip if already submitted
+            existing = get_submission(req.business_id, dir_id)
+            if existing and existing.get("status") == "submitted":
+                await broadcast_sse({
+                    "directory_id": dir_id, "step": "complete",
+                    "status": "already_listed",
+                    "message": "Έχει ήδη υποβληθεί.",
+                    "url": existing.get("url", ""),
+                })
+                results_summary.append({"dir": dir_id, "status": "already_listed"})
                 continue
 
             upsert_submission(req.business_id, dir_id, "running")
@@ -167,20 +190,40 @@ async def start_automation(req: SubmissionRequest):
             automation = AUTOMATION_MAP[dir_id](on_progress=on_progress)
             active_automation = automation
 
-            result = await automation.run(business)
+            # Pick a random proxy if available
+            proxy = random.choice(proxies) if proxies else None
 
-            status = "submitted" if result.success else "error"
+            result = await automation.run(business, proxy=proxy)
+
+            # Determine status
+            if result.message and "Υπάρχει ήδη" in result.message:
+                status = "already_listed"
+            elif result.success:
+                status = "submitted"
+            else:
+                status = "error"
+
             upsert_submission(req.business_id, dir_id, status, result.message, result.url)
+
+            # Save screenshot path if available
+            if result.screenshot:
+                upsert_submission(req.business_id, dir_id, status, result.message, result.url)
+
             await broadcast_sse({
                 "directory_id": dir_id,
                 "step": "complete",
                 "status": status,
                 "message": result.message,
                 "url": result.url,
+                "screenshot": result.screenshot,
             })
+            results_summary.append({"dir": dir_id, "status": status, "message": result.message})
 
         active_automation = None
         await broadcast_sse({"directory_id": "all", "step": "done", "status": "complete", "message": "Όλοι οι κατάλογοι ολοκληρώθηκαν"})
+
+        # Send email notification
+        await send_completion_email(business, results_summary)
 
     asyncio.create_task(run_all())
     return {"message": "Automation started"}
@@ -220,6 +263,101 @@ async def sse_events():
             sse_queues.remove(queue)
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+
+# --- Email notification ---
+
+async def send_completion_email(business: dict, results: list):
+    """Send email when all submissions complete."""
+    smtp_host = get_setting("smtp_host")
+    smtp_port = get_setting("smtp_port")
+    smtp_user = get_setting("smtp_user")
+    smtp_pass = get_setting("smtp_password")
+    notify_email = get_setting("notify_email")
+
+    if not all([smtp_host, smtp_user, smtp_pass, notify_email]):
+        return  # Email not configured
+
+    try:
+        biz_name = business.get("name", "Unknown")
+        submitted = sum(1 for r in results if r["status"] == "submitted")
+        already = sum(1 for r in results if r["status"] == "already_listed")
+        errors = sum(1 for r in results if r["status"] == "error")
+
+        body = f"""Ολοκληρώθηκε η υποβολή για: {biz_name}
+
+Αποτελέσματα:
+  Υποβλήθηκαν: {submitted}
+  Ήδη υπάρχουν: {already}
+  Σφάλματα: {errors}
+
+Λεπτομέρειες:
+"""
+        for r in results:
+            status_icon = {"submitted": "✓", "already_listed": "≡", "error": "✗"}.get(r["status"], "?")
+            body += f"  {status_icon} {r['dir']}: {r.get('message', r['status'])}\n"
+
+        msg = MIMEMultipart()
+        msg["From"] = smtp_user
+        msg["To"] = notify_email
+        msg["Subject"] = f"Citations: {biz_name} — {submitted} υποβολές, {errors} σφάλματα"
+        msg.attach(MIMEText(body, "plain", "utf-8"))
+
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(None, lambda: _send_email(smtp_host, int(smtp_port or 587), smtp_user, smtp_pass, msg))
+    except Exception as e:
+        print(f"Email error: {e}")
+
+
+def _send_email(host, port, user, password, msg):
+    with smtplib.SMTP(host, port) as server:
+        server.starttls()
+        server.login(user, password)
+        server.send_message(msg)
+
+
+# --- Screenshots ---
+
+@app.get("/api/screenshots/{filename}")
+async def get_screenshot(filename: str):
+    path = f"/opt/citations/screenshots/{filename}"
+    if os.path.exists(path):
+        return FileResponse(path, media_type="image/png")
+    return JSONResponse({"error": "Not found"}, status_code=404)
+
+
+# --- Report export ---
+
+@app.get("/api/report/{business_id}")
+async def export_report(business_id: int):
+    """Export CSV report of all submissions for a business."""
+    from .supabase_db import _request
+    business = get_business(business_id)
+    if not business:
+        return JSONResponse({"error": "Business not found"}, status_code=404)
+
+    subs = _request("citations_submissions", filters=f"business_id=eq.{business_id}")
+    if not subs:
+        subs = []
+
+    # Build CSV
+    lines = ["Directory,Status,Notes,URL,Date"]
+    for s in subs:
+        dir_name = s.get("directory_id", "")
+        status = s.get("status", "")
+        notes = (s.get("notes", "") or "").replace(",", ";").replace("\n", " ")
+        url = s.get("url", "") or ""
+        date = s.get("submitted_at", s.get("updated_at", "")) or ""
+        lines.append(f"{dir_name},{status},{notes},{url},{date}")
+
+    csv_content = "\n".join(lines)
+    biz_name = business.get("name", "business").replace(" ", "_")
+
+    return StreamingResponse(
+        iter(["\ufeff" + csv_content]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename=report_{biz_name}.csv"},
+    )
 
 
 # --- Serve frontend (static files at root for relative paths) ---

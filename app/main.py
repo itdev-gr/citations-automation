@@ -149,15 +149,15 @@ async def start_nap_check(req: NapCheckRequest):
     if not business:
         return JSONResponse({"error": "Business not found"}, status_code=404)
 
-    # If no directories specified, use all submitted ones
+    # If no directories specified, use submitted ones; if none, check all supported
     dir_ids = req.directories
     if not dir_ids:
         subs = _request("citations_submissions",
                         filters=f"business_id=eq.{req.business_id}&status=eq.submitted")
         dir_ids = [s["directory_id"] for s in (subs or [])]
-
     if not dir_ids:
-        return JSONResponse({"error": "Δεν υπάρχουν υποβληθέντες κατάλογοι"}, status_code=400)
+        from .nap_checker import DIRECTORY_SEARCH
+        dir_ids = list(DIRECTORY_SEARCH.keys())
 
     async def on_progress(dir_id, status, message):
         await broadcast_sse({

@@ -218,45 +218,54 @@ async def start_automation(req: SubmissionRequest):
             upsert_submission(req.business_id, dir_id, "running")
             await broadcast_sse({"directory_id": dir_id, "step": "start", "status": "running", "message": f"Εκκίνηση {dir_id}..."})
 
-            async def on_progress(event):
-                await broadcast_sse({
-                    "directory_id": event.directory_id,
-                    "step": event.step,
-                    "status": event.status,
-                    "message": event.message,
-                })
+            try:
+                async def on_progress(event):
+                    await broadcast_sse({
+                        "directory_id": event.directory_id,
+                        "step": event.step,
+                        "status": event.status,
+                        "message": event.message,
+                    })
 
-            automation = AUTOMATION_MAP[dir_id](on_progress=on_progress)
-            active_automation = automation
+                automation = AUTOMATION_MAP[dir_id](on_progress=on_progress)
+                active_automation = automation
 
-            # Pick a random proxy if available
-            proxy = random.choice(proxies) if proxies else None
+                # Pick a random proxy if available
+                proxy = random.choice(proxies) if proxies else None
 
-            result = await automation.run(business, proxy=proxy)
+                result = await automation.run(business, proxy=proxy)
 
-            # Determine status
-            if result.message and "Υπάρχει ήδη" in result.message:
-                status = "already_listed"
-            elif result.success:
-                status = "submitted"
-            else:
-                status = "error"
+                # Determine status
+                if result.message and "Υπάρχει ήδη" in result.message:
+                    status = "already_listed"
+                elif result.success:
+                    status = "submitted"
+                else:
+                    status = "error"
 
-            upsert_submission(req.business_id, dir_id, status, result.message, result.url)
-
-            # Save screenshot path if available
-            if result.screenshot:
                 upsert_submission(req.business_id, dir_id, status, result.message, result.url)
 
-            await broadcast_sse({
-                "directory_id": dir_id,
-                "step": "complete",
-                "status": status,
-                "message": result.message,
-                "url": result.url,
-                "screenshot": result.screenshot,
-            })
-            results_summary.append({"dir": dir_id, "status": status, "message": result.message})
+                await broadcast_sse({
+                    "directory_id": dir_id,
+                    "step": "complete",
+                    "status": status,
+                    "message": result.message,
+                    "url": result.url,
+                    "screenshot": result.screenshot,
+                })
+                results_summary.append({"dir": dir_id, "status": status, "message": result.message})
+
+            except Exception as e:
+                error_msg = f"Σφάλμα: {str(e)}"
+                upsert_submission(req.business_id, dir_id, "error", error_msg)
+                await broadcast_sse({
+                    "directory_id": dir_id,
+                    "step": "complete",
+                    "status": "error",
+                    "message": error_msg,
+                })
+                results_summary.append({"dir": dir_id, "status": "error", "message": error_msg})
+                # Continue to next directory!
 
         active_automation = None
         await broadcast_sse({"directory_id": "all", "step": "done", "status": "complete", "message": "Όλοι οι κατάλογοι ολοκληρώθηκαν"})

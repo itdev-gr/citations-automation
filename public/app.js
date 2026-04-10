@@ -131,7 +131,13 @@ async function importCSV(input) {
     const lines = text.split('\n');
     if (lines.length < 2) { alert('Το CSV είναι κενό'); return; }
 
-    const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/['"]/g, '').replace(/ /g, '_'));
+    const rawHeaders = parseCSVLine(lines[0]);
+    const headers = rawHeaders.map(h => h.trim().replace(/['"]/g, ''));
+    const headersLower = headers.map(h => h.toLowerCase().replace(/ /g, '_'));
+
+    // Detect GMB export by checking for Greek GMB-specific headers
+    const isGMB = headers.some(h => h.startsWith('Επωνυμία επιχείρησης') || h.startsWith('Κύρια κατηγορία'));
+
     const fieldMap = {
         business_name: 'name', company_name: 'name', eponymia: 'name', name: 'name',
         name_en: 'name_en', english_name: 'name_en',
@@ -149,6 +155,35 @@ async function importCSV(input) {
         facebook: 'facebook', instagram: 'instagram', linkedin: 'linkedin',
         tax_id: 'tax_id', afm: 'tax_id', contact_person: 'contact_person',
     };
+
+    // GMB Greek header mapping
+    const gmbFieldMap = {};
+    if (isGMB) {
+        headers.forEach((h, idx) => {
+            if (h === 'Επωνυμία επιχείρησης') gmbFieldMap[idx] = 'name';
+            else if (h === 'Γραμμή διεύθυνσης 1') gmbFieldMap[idx] = 'address';
+            else if (h === 'Πόλη') gmbFieldMap[idx] = 'city';
+            else if (h === 'Ταχυδρομικός κώδικας') gmbFieldMap[idx] = 'postal_code';
+            else if (h === 'Διοικητική περιοχή') gmbFieldMap[idx] = 'region';
+            else if (h === 'Κύριος αριθμός τηλ.') gmbFieldMap[idx] = 'phone';
+            else if (h === 'Πρόσθετα τηλέφωνα') gmbFieldMap[idx] = 'mobile';
+            else if (h === 'Ιστότοπος') gmbFieldMap[idx] = 'website';
+            else if (h === 'Κύρια κατηγορία') gmbFieldMap[idx] = 'category';
+            else if (h === 'Από την επιχείρηση') gmbFieldMap[idx] = 'description_en';
+            else if (h.includes('Facebook')) gmbFieldMap[idx] = 'facebook';
+            else if (h.includes('Instagram')) gmbFieldMap[idx] = 'instagram';
+            else if (h.includes('Linkedin')) gmbFieldMap[idx] = 'linkedin';
+        });
+    }
+
+    // GMB hours day columns
+    const gmbDayColumns = {};
+    const dayLabels = { 'Ωράριο Δευτέρας': 'Δευ', 'Ωράριο Τρίτης': 'Τρι', 'Ωράριο Τετάρτης': 'Τετ',
+        'Ωράριο Πέμπτης': 'Πεμ', 'Ωράριο Παρασκευής': 'Παρ', 'Ωράριο Σαββάτου': 'Σαβ', 'Ωράριο Κυριακής': 'Κυρ' };
+    if (isGMB) {
+        headers.forEach((h, idx) => { if (dayLabels[h]) gmbDayColumns[idx] = dayLabels[h]; });
+    }
+
     const validFields = ['name','name_en','address','city','city_en','postal_code','region',
         'phone','mobile','email','website','category','category_en','contact_person',
         'tax_id','hours','facebook','instagram','linkedin','description_gr','description_en'];
@@ -159,10 +194,31 @@ async function importCSV(input) {
         if (!line) continue;
         const values = parseCSVLine(line);
         const row = {};
-        headers.forEach((h, idx) => {
-            const field = fieldMap[h] || h;
-            if (validFields.includes(field)) row[field] = (values[idx] || '').trim();
-        });
+
+        if (isGMB) {
+            // Map GMB fields
+            for (const [idx, field] of Object.entries(gmbFieldMap)) {
+                const val = (values[parseInt(idx)] || '').trim();
+                if (val && validFields.includes(field)) row[field] = val;
+            }
+            // Also set name_en = name (GMB names are usually in English/Latin)
+            if (row.name) row.name_en = row.name;
+            if (row.category) row.category_en = row.category;
+            if (row.description_en) row.description_gr = row.description_en;
+            // Build hours string from day columns
+            const hoursParts = [];
+            for (const [idx, day] of Object.entries(gmbDayColumns)) {
+                const val = (values[parseInt(idx)] || '').trim();
+                if (val) hoursParts.push(`${day} ${val}`);
+            }
+            if (hoursParts.length) row.hours = hoursParts.join(', ');
+        } else {
+            headersLower.forEach((h, idx) => {
+                const field = fieldMap[h] || h;
+                if (validFields.includes(field)) row[field] = (values[idx] || '').trim();
+            });
+        }
+
         if (row.name) {
             await supabase('citations_businesses', { method: 'POST', body: row });
             imported++;

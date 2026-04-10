@@ -43,10 +43,8 @@ const DIRECTORIES = [
     // Ευρωπαϊκοί / Διεθνείς
     { id: 'europages', name: 'Europages', url: 'https://www.europages.gr', type: 'Ευρωπαϊκός' },
     { id: 'cybo', name: 'Cybo', url: 'https://www.cybo.com', type: 'Διεθνής' },
-    { id: 'infobel', name: 'Infobel', url: 'https://www.infobel.com', type: 'Ευρωπαϊκός' },
     { id: 'brownbook', name: 'Brownbook.net', url: 'https://www.brownbook.net', type: 'Διεθνής' },
     { id: 'storeboard', name: 'Storeboard', url: 'https://www.storeboard.com', type: 'Διεθνής' },
-    { id: 'yellowplace', name: 'Yellow.Place', url: 'https://yellow.place', type: 'Διεθνής' },
     { id: 'showmelocal', name: 'ShowMeLocal', url: 'https://www.showmelocal.com', type: 'Διεθνής' },
     { id: 'globalcatalog', name: 'GlobalCatalog', url: 'https://www.globalcatalog.com', type: 'Διεθνής' },
     { id: 'twofindlocal', name: '2FindLocal', url: 'https://www.2findlocal.com', type: 'Διεθνής' },

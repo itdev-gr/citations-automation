@@ -13,7 +13,6 @@ DIRECTORIES = [
     {"id": "foursquare", "name": "Foursquare", "url": "https://foursquare.com", "type": "Global"},
     {"id": "apple_business", "name": "Apple Business Connect", "url": "https://businessconnect.apple.com", "type": "Global"},
     {"id": "cybo", "name": "Cybo", "url": "https://www.cybo.com", "type": "International"},
-    {"id": "infobel", "name": "Infobel", "url": "https://www.infobel.com", "type": "European"},
 ]
 
 

@@ -31,10 +31,6 @@ DIRECTORY_SEARCH = {
         "search_url": "https://www.tupalo.co/search?q={name}&where={city}",
         "result_selector": ".venue-name a, h3 a",
     },
-    "yellowplace": {
-        "search_url": "https://yellow.place/en/search?q={name}&location={city}",
-        "result_selector": ".place-name a, h3 a",
-    },
     "globalcatalog": {
         "search_url": "https://www.globalcatalog.com/search.aspx?q={name}+{city}",
         "result_selector": ".company-name a, h3 a",
@@ -42,10 +38,6 @@ DIRECTORY_SEARCH = {
     "showmelocal": {
         "search_url": "https://www.showmelocal.com/search?q={name}&loc={city}",
         "result_selector": ".business-name a, h3 a",
-    },
-    "infobel": {
-        "search_url": "https://www.infobel.com/en/greece/{name}/{city}",
-        "result_selector": ".company-name a, h3 a",
     },
     "trustpilot": {
         "search_url": "https://www.trustpilot.com/search?query={name}",

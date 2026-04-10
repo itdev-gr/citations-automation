@@ -23,7 +23,6 @@ from .automations.stigmap import StigMapAutomation
 from .automations.europages import EuropagesAutomation
 from .automations.foursquare import FoursquareAutomation
 from .automations.cybo import CyboAutomation
-from .automations.infobel import InfobelAutomation
 from .automations.waze import WazeAutomation
 from .automations.tomtom import TomTomAutomation
 from .automations.here import HereAutomation
@@ -31,7 +30,6 @@ from .automations.openstreetmap import OpenStreetMapAutomation
 from .automations.tupalo import TupaloAutomation
 from .automations.brownbook import BrownbookAutomation
 from .automations.storeboard import StoreboardAutomation
-from .automations.yellowplace import YellowPlaceAutomation
 from .automations.showmelocal import ShowMeLocalAutomation
 from .automations.globalcatalog import GlobalCatalogAutomation
 from .automations.twofindlocal import TwoFindLocalAutomation
@@ -52,10 +50,8 @@ AUTOMATION_MAP = {
     "tupalo": TupaloAutomation,
     "europages": EuropagesAutomation,
     "cybo": CyboAutomation,
-    "infobel": InfobelAutomation,
     "brownbook": BrownbookAutomation,
     "storeboard": StoreboardAutomation,
-    "yellowplace": YellowPlaceAutomation,
     "showmelocal": ShowMeLocalAutomation,
     "globalcatalog": GlobalCatalogAutomation,
     "twofindlocal": TwoFindLocalAutomation,
@@ -81,10 +77,8 @@ DIRECTORIES = [
     # Ευρωπαϊκοί / Διεθνείς
     {"id": "europages", "name": "Europages", "url": "https://www.europages.gr", "type": "Ευρωπαϊκός"},
     {"id": "cybo", "name": "Cybo", "url": "https://www.cybo.com", "type": "Διεθνής"},
-    {"id": "infobel", "name": "Infobel", "url": "https://www.infobel.com", "type": "Ευρωπαϊκός"},
     {"id": "brownbook", "name": "Brownbook.net", "url": "https://www.brownbook.net", "type": "Διεθνής"},
     {"id": "storeboard", "name": "Storeboard", "url": "https://www.storeboard.com", "type": "Διεθνής"},
-    {"id": "yellowplace", "name": "Yellow.Place", "url": "https://yellow.place", "type": "Διεθνής"},
     {"id": "showmelocal", "name": "ShowMeLocal", "url": "https://www.showmelocal.com", "type": "Διεθνής"},
     {"id": "globalcatalog", "name": "GlobalCatalog", "url": "https://www.globalcatalog.com", "type": "Διεθνής"},
     {"id": "twofindlocal", "name": "2FindLocal", "url": "https://www.2findlocal.com", "type": "Διεθνής"},

@@ -202,10 +202,12 @@
     <!-- ΥΠΟΒΟΛΗ -->
     <div class="tab-content" id="tab-submit">
         <div class="card">
-            <h2>1. Επιλέξτε Επιχείρηση</h2>
-            <select id="submitBusinessSelect" style="width:100%;padding:10px;border:1px solid var(--gray-300);border-radius:6px;font-size:14px" onchange="onBusinessSelected()">
-                <option value="">-- Επιλέξτε επιχείρηση --</option>
-            </select>
+            <h2>1. Επιλέξτε Επιχειρήσεις</h2>
+            <div style="margin-bottom:10px">
+                <button class="btn btn-sm btn-outline" onclick="selectAllBusinesses()">Επιλογή Όλων</button>
+                <button class="btn btn-sm btn-outline" onclick="deselectAllBusinesses()">Αποεπιλογή</button>
+            </div>
+            <div id="businessCheckboxList" style="max-height:300px;overflow-y:auto;border:1px solid var(--gray-200);border-radius:6px;padding:8px"></div>
         </div>
 
         <div class="card">
@@ -233,6 +235,14 @@
                 <button class="btn btn-outline btn-lg" onclick="exportReport()">
                     Εξαγωγή Report (CSV)
                 </button>
+            </div>
+        </div>
+
+        <div class="card" id="bulkProgress" style="display:none">
+            <h2 id="bulkProgressTitle">Μαζική Υποβολή</h2>
+            <div id="bulkProgressText" style="font-size:13px;color:var(--gray-500);margin-bottom:8px"></div>
+            <div style="background:var(--gray-200);border-radius:8px;height:10px;overflow:hidden">
+                <div id="bulkProgressBar" style="height:100%;background:var(--primary);border-radius:8px;transition:width 0.3s;width:0%"></div>
             </div>
         </div>
 
@@ -272,6 +282,19 @@
                     <span style="font-size:13px;font-weight:600;white-space:nowrap" id="dashProgressPct">0%</span>
                 </div>
             </div>
+        </div>
+
+        <div class="card" id="resubmitFailedCard" style="display:none">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+                <div>
+                    <span style="font-size:14px;font-weight:500">Αποτυχημένες καταχωρήσεις:</span>
+                    <span id="failedCount" class="badge badge-error" style="margin-left:8px">0</span>
+                </div>
+                <button class="btn btn-primary" onclick="resubmitAllFailed()" id="resubmitAllBtn">
+                    Επανυποβολή Αποτυχημένων
+                </button>
+            </div>
+            <div id="bulkProgressInfo" style="display:none;margin-top:12px;padding:10px;background:var(--gray-50);border-radius:6px;font-size:13px"></div>
         </div>
 
         <div class="card">

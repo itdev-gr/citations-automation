@@ -284,11 +284,31 @@ function getSelectedDirs() { return [...document.querySelectorAll('#directoryGri
 
 // --- Submit tab ---
 function populateBusinessSelect() {
-    const sel = document.getElementById('submitBusinessSelect');
-    const val = sel.value;
-    sel.innerHTML = '<option value="">-- Επιλέξτε επιχείρηση --</option>' +
-        businesses.map(b => `<option value="${b.id}">${esc(b.name)} - ${esc(b.city || '')}</option>`).join('');
-    sel.value = val;
+    const container = document.getElementById('businessCheckboxList');
+    if (!container) return;
+    if (!businesses.length) {
+        container.innerHTML = '<div style="padding:12px;color:var(--gray-500);font-size:13px">Δεν υπάρχουν επιχειρήσεις.</div>';
+        return;
+    }
+    container.innerHTML = businesses.map(b => `
+        <label class="dir-item" style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid var(--gray-100);cursor:pointer">
+            <input type="checkbox" class="business-cb" value="${b.id}">
+            <div>
+                <strong>${esc(b.name)}</strong>
+                <span style="font-size:12px;color:var(--gray-500);margin-left:6px">${esc(b.city || '')}</span>
+            </div>
+        </label>
+    `).join('');
+}
+
+function selectAllBusinesses() {
+    document.querySelectorAll('.business-cb').forEach(cb => cb.checked = true);
+}
+function deselectAllBusinesses() {
+    document.querySelectorAll('.business-cb').forEach(cb => cb.checked = false);
+}
+function getSelectedBusinessIds() {
+    return [...document.querySelectorAll('.business-cb:checked')].map(cb => parseInt(cb.value));
 }
 
 function onBusinessSelected() {}
@@ -531,36 +551,99 @@ function startAutomation() {
     renderSubmitCards();
 }
 
+let bulkRunning = false;
+
 function startAutoSubmit() {
     automationMode = 'auto';
-    const businessId = document.getElementById('submitBusinessSelect').value;
-    if (!businessId) { alert('Επιλέξτε πρώτα μια επιχείρηση'); return; }
+    const bizIds = getSelectedBusinessIds();
+    if (!bizIds.length) { alert('Επιλέξτε τουλάχιστον μία επιχείρηση'); return; }
     const dirs = getSelectedDirs();
     if (!dirs.length) { alert('Επιλέξτε τουλάχιστον έναν κατάλογο'); return; }
 
-    renderSubmitCards();
+    runBulkAutoSubmit(bizIds, dirs);
+}
 
-    // Connect SSE for live progress
-    if (sseSource) sseSource.close();
-    sseSource = new EventSource(`${AUTOMATION_API}/api/events`);
-    sseSource.onmessage = (e) => {
-        const data = JSON.parse(e.data);
-        if (data.status === 'connected') return;
-        updateProgressCard(data);
-    };
-    sseSource.onerror = () => {
-        console.warn('SSE disconnected');
-    };
+async function runBulkAutoSubmit(bizIds, dirsByBiz) {
+    bulkRunning = true;
+    const isBulk = bizIds.length > 1 || (Array.isArray(dirsByBiz) && !dirsByBiz[0]?.dirs);
+    // Normalize to [{bizId, dirs}]
+    let jobs;
+    if (Array.isArray(dirsByBiz) && dirsByBiz[0]?.dirs) {
+        jobs = dirsByBiz; // already [{bizId, dirs}]
+    } else {
+        jobs = bizIds.map(id => ({ bizId: id, dirs: dirsByBiz }));
+    }
 
-    // Start automation on VPS
-    fetch(`${AUTOMATION_API}/api/automate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ business_id: parseInt(businessId), directories: dirs }),
-    }).then(r => r.json()).then(data => {
-        if (data.error) alert('Σφάλμα: ' + data.error);
-    }).catch(err => {
-        alert('Δεν ήταν δυνατή η σύνδεση με τον automation server.\n\nΣφάλμα: ' + err.message);
+    const bulkEl = document.getElementById('bulkProgress');
+    const bulkTitle = document.getElementById('bulkProgressTitle');
+    const bulkText = document.getElementById('bulkProgressText');
+    const bulkBar = document.getElementById('bulkProgressBar');
+
+    if (jobs.length > 1 && bulkEl) {
+        bulkEl.style.display = 'block';
+        bulkTitle.textContent = 'Μαζική Υποβολή';
+    }
+
+    for (let i = 0; i < jobs.length; i++) {
+        if (!bulkRunning) break;
+        const { bizId, dirs } = jobs[i];
+        const biz = businesses.find(b => b.id === bizId);
+        const bizName = biz ? biz.name : `#${bizId}`;
+
+        // Update bulk progress
+        if (jobs.length > 1 && bulkEl) {
+            const pct = Math.round((i / jobs.length) * 100);
+            bulkText.textContent = `Επιχείρηση ${i + 1}/${jobs.length}: ${bizName}...`;
+            bulkBar.style.width = pct + '%';
+        }
+
+        // Render progress cards for current business
+        renderSubmitCardsForBusiness(bizId, dirs);
+
+        // Wait for this business to complete via SSE
+        await runSingleBusinessAuto(bizId, dirs);
+        await loadSubmissions();
+    }
+
+    bulkRunning = false;
+    if (jobs.length > 1 && bulkEl) {
+        bulkText.textContent = `Ολοκληρώθηκε! ${jobs.length} επιχειρήσεις.`;
+        bulkBar.style.width = '100%';
+    }
+    await loadSubmissions();
+}
+
+function runSingleBusinessAuto(businessId, dirs) {
+    return new Promise((resolve) => {
+        if (sseSource) sseSource.close();
+        sseSource = new EventSource(`${AUTOMATION_API}/api/events`);
+        sseSource.onmessage = (e) => {
+            const data = JSON.parse(e.data);
+            if (data.status === 'connected') return;
+            updateProgressCard(data);
+            if (data.directory_id === 'all' && data.step === 'done') {
+                if (sseSource) { sseSource.close(); sseSource = null; }
+                resolve();
+            }
+        };
+        sseSource.onerror = () => {
+            console.warn('SSE disconnected');
+            setTimeout(resolve, 2000);
+        };
+
+        fetch(`${AUTOMATION_API}/api/automate`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ business_id: businessId, directories: dirs }),
+        }).then(r => r.json()).then(data => {
+            if (data.error) {
+                alert('Σφάλμα: ' + data.error);
+                resolve();
+            }
+        }).catch(err => {
+            alert('Δεν ήταν δυνατή η σύνδεση με τον automation server.\n\nΣφάλμα: ' + err.message);
+            resolve();
+        });
     });
 }
 
@@ -614,20 +697,19 @@ function updateProgressCard(data) {
         }
     }
 
-    if (dirId === 'all' && data.step === 'done') {
-        if (sseSource) { sseSource.close(); sseSource = null; }
-        loadSubmissions();
-    }
+    // Note: SSE close on "all done" is handled in runSingleBusinessAuto
 }
 
 function renderSubmitCards() {
-    const businessId = document.getElementById('submitBusinessSelect').value;
-    if (!businessId) { alert('Επιλέξτε πρώτα μια επιχείρηση'); return; }
+    const bizIds = getSelectedBusinessIds();
+    if (!bizIds.length) { alert('Επιλέξτε πρώτα μια επιχείρηση'); return; }
 
     const dirs = getSelectedDirs();
     if (!dirs.length) { alert('Επιλέξτε τουλάχιστον έναν κατάλογο'); return; }
 
-    const biz = businesses.find(b => b.id === parseInt(businessId));
+    // For manual mode, render first selected business
+    const businessId = bizIds[0];
+    const biz = businesses.find(b => b.id === businessId);
     if (!biz) return;
 
     document.getElementById('progressCard').style.display = 'block';
@@ -673,6 +755,40 @@ function renderSubmitCards() {
             </div>
             ${autoMsg}
             <div class="copy-fields">${fieldRows}</div>
+        </div>`;
+    }).join('');
+
+    document.getElementById('progressCard').scrollIntoView({ behavior: 'smooth' });
+}
+
+function renderSubmitCardsForBusiness(businessId, dirs) {
+    const biz = businesses.find(b => b.id === businessId);
+    if (!biz) return;
+
+    document.getElementById('progressCard').style.display = 'block';
+    const progressList = document.getElementById('progressList');
+
+    progressList.innerHTML = `<div style="padding:8px 0;font-weight:600;font-size:15px;border-bottom:1px solid var(--gray-200);margin-bottom:8px">${esc(biz.name)}</div>` +
+    dirs.map(dirId => {
+        const dir = directories.find(x => x.id === dirId);
+        const dirName = dir ? dir.name : dirId;
+        const regUrl = DIR_REG_URLS[dirId] || '#';
+        const sub = submissions.find(s => s.business_id === biz.id && s.directory_id === dirId);
+        const isDone = sub && sub.status === 'submitted';
+
+        const autoMsg = `<div class="auto-status" id="msg-${dirId}" style="padding:8px 16px;font-size:13px;color:var(--gray-500);"></div>`;
+
+        return `<div class="dir-card ${isDone ? 'done' : ''}" id="dircard-${dirId}">
+            <div class="dir-card-header">
+                <div>
+                    <strong>${esc(dirName)}</strong>
+                    <span class="badge badge-${isDone ? 'submitted' : 'pending'}" id="badge-${dirId}">${isDone ? 'Υποβλήθηκε' : 'Εκκρεμεί'}</span>
+                </div>
+                <div class="dir-card-actions">
+                    <a href="${regUrl}" target="_blank" class="btn btn-sm btn-primary">Άνοιγμα &rarr;</a>
+                </div>
+            </div>
+            ${autoMsg}
         </div>`;
     }).join('');
 
@@ -777,6 +893,17 @@ async function loadStatusMatrix() {
         const totalSubmitted = submissions.filter(s => s.status === 'submitted' || s.status === 'already_listed').length;
         const totalErrors = submissions.filter(s => s.status === 'error').length;
         const totalPending = totalSlots - totalSubmitted - totalErrors;
+
+        // Show/hide resubmit failed button
+        const resubmitCard = document.getElementById('resubmitFailedCard');
+        if (resubmitCard) {
+            if (totalErrors > 0) {
+                resubmitCard.style.display = 'block';
+                document.getElementById('failedCount').textContent = totalErrors;
+            } else {
+                resubmitCard.style.display = 'none';
+            }
+        }
         const pct = totalSlots ? Math.round(totalSubmitted / totalSlots * 100) : 0;
         document.getElementById('dashTotal').textContent = businesses.length;
         document.getElementById('dashSubmitted').textContent = totalSubmitted;
@@ -787,10 +914,11 @@ async function loadStatusMatrix() {
     }
 
     const thead = table.querySelector('thead tr');
-    thead.innerHTML = '<th>Επιχείρηση</th>' + directories.map(d => `<th title="${d.name}">${d.id.replace('_', ' ')}</th>`).join('');
+    thead.innerHTML = '<th>Επιχείρηση</th>' + directories.map(d => `<th title="${d.name}">${d.id.replace('_', ' ')}</th>`).join('') + '<th></th>';
 
     const tbody = table.querySelector('tbody');
     tbody.innerHTML = businesses.map(b => {
+        const bizErrors = submissions.filter(s => s.business_id === b.id && s.status === 'error');
         const cells = directories.map(d => {
             const sub = submissions.find(s => s.business_id === b.id && s.directory_id === d.id);
             const status = sub ? sub.status : 'pending';
@@ -805,8 +933,74 @@ async function loadStatusMatrix() {
             }
             return `<td><span class="badge badge-${status}"${tooltip}>${statusLabel(status)}</span></td>`;
         }).join('');
-        return `<tr><td><strong>${esc(b.name)}</strong></td>${cells}</tr>`;
+        const resubmitBtn = bizErrors.length > 0
+            ? `<td><button class="btn btn-sm btn-outline" onclick="resubmitBusinessFailed(${b.id})" title="Επανυποβολή ${bizErrors.length} αποτυχημένων" style="white-space:nowrap">↻ ${bizErrors.length}</button></td>`
+            : '<td></td>';
+        return `<tr><td><strong>${esc(b.name)}</strong></td>${cells}${resubmitBtn}</tr>`;
     }).join('');
+}
+
+// --- Resubmit Failed ---
+async function resubmitAllFailed() {
+    const failed = submissions.filter(s => s.status === 'error');
+    if (!failed.length) { alert('Δεν υπάρχουν αποτυχημένες καταχωρήσεις'); return; }
+    if (!confirm(`Επανυποβολή ${failed.length} αποτυχημένων καταχωρήσεων;`)) return;
+
+    // Group by business_id
+    const byBiz = {};
+    failed.forEach(s => {
+        if (!byBiz[s.business_id]) byBiz[s.business_id] = [];
+        byBiz[s.business_id].push(s.directory_id);
+    });
+
+    // Reset statuses
+    for (const s of failed) {
+        await supabase('citations_submissions', {
+            method: 'PATCH',
+            filters: `business_id=eq.${s.business_id}&directory_id=eq.${s.directory_id}`,
+            body: { status: 'pending', notes: '', url: '' },
+        });
+    }
+    await loadSubmissions();
+
+    // Switch to submit tab
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    document.querySelector('[data-tab="submit"]').classList.add('active');
+    document.getElementById('tab-submit').classList.add('active');
+
+    automationMode = 'auto';
+    const jobs = Object.entries(byBiz).map(([bizId, dirs]) => ({ bizId: parseInt(bizId), dirs }));
+    await runBulkAutoSubmit(jobs.map(j => j.bizId), jobs);
+}
+
+async function resubmitBusinessFailed(businessId) {
+    const failed = submissions.filter(s => s.business_id === businessId && s.status === 'error');
+    if (!failed.length) { alert('Δεν υπάρχουν αποτυχημένες καταχωρήσεις γι\' αυτή την επιχείρηση'); return; }
+
+    const biz = businesses.find(b => b.id === businessId);
+    if (!confirm(`Επανυποβολή ${failed.length} αποτυχημένων για "${biz?.name || businessId}";`)) return;
+
+    const dirs = failed.map(s => s.directory_id);
+
+    // Reset statuses
+    for (const s of failed) {
+        await supabase('citations_submissions', {
+            method: 'PATCH',
+            filters: `business_id=eq.${s.business_id}&directory_id=eq.${s.directory_id}`,
+            body: { status: 'pending', notes: '', url: '' },
+        });
+    }
+    await loadSubmissions();
+
+    // Switch to submit tab
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    document.querySelector('[data-tab="submit"]').classList.add('active');
+    document.getElementById('tab-submit').classList.add('active');
+
+    automationMode = 'auto';
+    await runBulkAutoSubmit([businessId], [{ bizId: businessId, dirs }]);
 }
 
 // --- Settings ---

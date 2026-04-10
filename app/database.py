@@ -9,9 +9,7 @@ DIRECTORIES = [
     {"id": "xo_gr", "name": "Χρυσός Οδηγός (xo.gr)", "url": "https://www.xo.gr", "type": "Greek"},
     {"id": "vrisko", "name": "Vrisko.gr (11880)", "url": "https://www.vrisko.gr", "type": "Greek"},
     {"id": "europages", "name": "Europages", "url": "https://www.europages.gr", "type": "European"},
-    {"id": "bing_places", "name": "Bing Places", "url": "https://www.bingplaces.com", "type": "Global"},
     {"id": "foursquare", "name": "Foursquare", "url": "https://foursquare.com", "type": "Global"},
-    {"id": "apple_business", "name": "Apple Business Connect", "url": "https://businessconnect.apple.com", "type": "Global"},
     {"id": "cybo", "name": "Cybo", "url": "https://www.cybo.com", "type": "International"},
 ]
 

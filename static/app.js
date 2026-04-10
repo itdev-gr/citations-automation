@@ -26,6 +26,7 @@ function initTabs() {
 
             if (tab.dataset.tab === 'status') loadStatusMatrix();
             if (tab.dataset.tab === 'submit') populateBusinessSelect();
+            if (tab.dataset.tab === 'nap') populateNapSelect();
         });
     });
 }
@@ -258,7 +259,7 @@ const DIR_REG_URLS = {
     twofindlocal: 'https://www.2findlocal.com/Modules/Biz/bizPhoneLookup.php',
     trustpilot: 'https://business.trustpilot.com/signup',
     citymaps: 'https://citymaps.gr/',
-    napfinder: 'https://www.napfinder.com/add-business',
+
 };
 
 // Which fields each directory needs (for the copy panel)
@@ -469,16 +470,6 @@ const DIR_FIELDS = {
         { label: 'Website', key: 'website' },
         { label: 'Κατηγορία', key: 'category' },
         { label: 'Περιγραφή', key: 'description_gr' },
-    ],
-    napfinder: [
-        { label: 'Business Name', key: 'name_en', fallback: 'name' },
-        { label: 'Phone', key: 'phone' },
-        { label: 'Address', key: 'address' },
-        { label: 'City', key: 'city_en', fallback: 'city' },
-        { label: 'Zip', key: 'postal_code' },
-        { label: 'Website', key: 'website' },
-        { label: 'Email', key: 'email' },
-        { label: 'Country', key: '_static', value: 'Greece' },
     ],
 };
 
@@ -825,6 +816,129 @@ async function checkServerStatus() {
         document.getElementById('serverStatus').className = 'badge badge-error';
         document.getElementById('serverStatus').textContent = 'Offline';
     }
+}
+
+// --- NAP Checker ---
+function populateNapSelect() {
+    const sel = document.getElementById('napBusinessSelect');
+    const val = sel.value;
+    sel.innerHTML = '<option value="">-- Επιλέξτε επιχείρηση --</option>' +
+        businesses.map(b => `<option value="${b.id}">${esc(b.name)} - ${esc(b.city || '')}</option>`).join('');
+    sel.value = val;
+}
+
+async function startNapCheck() {
+    const businessId = document.getElementById('napBusinessSelect').value;
+    if (!businessId) { alert('Επιλέξτε πρώτα μια επιχείρηση'); return; }
+
+    document.getElementById('napResults').style.display = 'block';
+    document.getElementById('napTableBody').innerHTML = '<tr><td colspan="6" style="text-align:center;padding:20px">Ελέγχος σε εξέλιξη...</td></tr>';
+    document.getElementById('napScore').textContent = 'Αναζήτηση...';
+    document.getElementById('napScore').style.background = '#f3f4f6';
+    document.getElementById('napProgress').textContent = '';
+
+    // Connect SSE
+    if (sseSource) sseSource.close();
+    sseSource = new EventSource(`${AUTOMATION_API}/api/events`);
+    sseSource.onmessage = (e) => {
+        const data = JSON.parse(e.data);
+        if (data.status === 'connected') return;
+
+        if (data.step === 'nap_check') {
+            document.getElementById('napProgress').textContent = data.message || '';
+        }
+
+        if (data.directory_id === 'nap' && data.step === 'done' && data.results) {
+            renderNapResults(data.results);
+            sseSource.close();
+            sseSource = null;
+        }
+    };
+
+    try {
+        const res = await fetch(`${AUTOMATION_API}/api/nap-check`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ business_id: parseInt(businessId) }),
+        });
+        const data = await res.json();
+        if (data.error) {
+            alert(data.error);
+            document.getElementById('napResults').style.display = 'none';
+        }
+    } catch (e) {
+        alert('Σφάλμα σύνδεσης με τον server');
+    }
+}
+
+function renderNapResults(results) {
+    const tbody = document.getElementById('napTableBody');
+    let totalChecked = 0;
+    let totalMatch = 0;
+
+    const napStatusIcon = (field) => {
+        if (!field) return '<span style="color:var(--gray-300)">—</span>';
+        const icons = {
+            match: '<span style="color:var(--success)" title="Σωστό">✓</span>',
+            partial: '<span style="color:var(--warning)" title="Μερική αντιστοιχία">~</span>',
+            mismatch: '<span style="color:var(--danger)" title="Λάθος">✗</span>',
+            not_found: '<span style="color:var(--gray-300)" title="Δεν βρέθηκε">—</span>',
+            empty: '<span style="color:var(--gray-300)">—</span>',
+            not_checked: '<span style="color:var(--gray-300)">—</span>',
+            not_supported: '<span style="color:var(--gray-300)">N/A</span>',
+        };
+        return icons[field.status] || '—';
+    };
+
+    const napDetail = (field) => {
+        if (!field || !field.found) return '';
+        if (field.status === 'match') return '';
+        if (field.status === 'mismatch' || field.status === 'partial') {
+            return `<div style="font-size:11px;color:var(--gray-500);margin-top:2px">Βρέθηκε: ${esc(field.found || '')}</div>`;
+        }
+        return '';
+    };
+
+    tbody.innerHTML = results.map(r => {
+        const dirName = directories.find(d => d.id === r.directory_id)?.name || r.directory_id;
+
+        if (r.found) {
+            ['name', 'address', 'phone'].forEach(f => {
+                if (r[f] && r[f].status !== 'not_supported' && r[f].status !== 'not_checked' && r[f].status !== 'empty') {
+                    totalChecked++;
+                    if (r[f].match) totalMatch++;
+                }
+            });
+        }
+
+        return `<tr>
+            <td><strong>${esc(dirName)}</strong></td>
+            <td>${r.found ? '<span style="color:var(--success)">Ναι</span>' : '<span style="color:var(--gray-300)">Όχι</span>'}</td>
+            <td>${napStatusIcon(r.name)}${napDetail(r.name)}</td>
+            <td>${napStatusIcon(r.address)}${napDetail(r.address)}</td>
+            <td>${napStatusIcon(r.phone)}${napDetail(r.phone)}</td>
+            <td>${r.listing_url ? `<a href="${esc(r.listing_url)}" target="_blank" class="btn btn-sm btn-outline">Άνοιγμα ↗</a>` : '—'}</td>
+        </tr>`;
+    }).join('');
+
+    // Score
+    const scoreEl = document.getElementById('napScore');
+    if (totalChecked > 0) {
+        const pct = Math.round((totalMatch / totalChecked) * 100);
+        scoreEl.textContent = `NAP Score: ${pct}% (${totalMatch}/${totalChecked} σωστά)`;
+        if (pct >= 80) {
+            scoreEl.style.background = '#dcfce7'; scoreEl.style.color = 'var(--success)';
+        } else if (pct >= 50) {
+            scoreEl.style.background = '#fef3c7'; scoreEl.style.color = 'var(--warning)';
+        } else {
+            scoreEl.style.background = '#fee2e2'; scoreEl.style.color = 'var(--danger)';
+        }
+    } else {
+        scoreEl.textContent = 'Δεν βρέθηκαν καταχωρίσεις για έλεγχο';
+        scoreEl.style.background = '#f3f4f6'; scoreEl.style.color = 'var(--gray-500)';
+    }
+
+    document.getElementById('napProgress').textContent = 'Ολοκληρώθηκε';
 }
 
 // --- Helpers ---

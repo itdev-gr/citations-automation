@@ -35,7 +35,6 @@ from .automations.globalcatalog import GlobalCatalogAutomation
 from .automations.twofindlocal import TwoFindLocalAutomation
 from .automations.trustpilot import TrustpilotAutomation
 from .automations.citymaps import CityMapsAutomation
-from .automations.napfinder import NapFinderAutomation
 
 AUTOMATION_MAP = {
     "xo_gr": XoGrAutomation,
@@ -60,7 +59,6 @@ AUTOMATION_MAP = {
     "twofindlocal": TwoFindLocalAutomation,
     "trustpilot": TrustpilotAutomation,
     "citymaps": CityMapsAutomation,
-    "napfinder": NapFinderAutomation,
 }
 
 DIRECTORIES = [
@@ -90,7 +88,6 @@ DIRECTORIES = [
     {"id": "twofindlocal", "name": "2FindLocal", "url": "https://www.2findlocal.com", "type": "Διεθνής"},
     {"id": "trustpilot", "name": "Trustpilot", "url": "https://www.trustpilot.com", "type": "Reviews"},
     {"id": "citymaps", "name": "CityMaps.gr", "url": "https://citymaps.gr", "type": "Ελληνικός"},
-    {"id": "napfinder", "name": "NAP Finder", "url": "https://www.napfinder.com", "type": "Διεθνής"},
 ]
 
 # Global state for active automation
@@ -139,6 +136,48 @@ async def update_setting(s: SettingUpdate):
 async def read_setting(key: str):
     val = get_setting(key)
     return {"key": key, "value": val or ""}
+
+
+# --- NAP Checker ---
+
+class NapCheckRequest(BaseModel):
+    business_id: int
+    directories: list[str] = []
+
+@app.post("/api/nap-check")
+async def start_nap_check(req: NapCheckRequest):
+    from .nap_checker import run_nap_check
+    from .supabase_db import _request
+
+    business = get_business(req.business_id)
+    if not business:
+        return JSONResponse({"error": "Business not found"}, status_code=404)
+
+    # If no directories specified, use all submitted ones
+    dir_ids = req.directories
+    if not dir_ids:
+        subs = _request("citations_submissions",
+                        filters=f"business_id=eq.{req.business_id}&status=eq.submitted")
+        dir_ids = [s["directory_id"] for s in (subs or [])]
+
+    if not dir_ids:
+        return JSONResponse({"error": "Δεν υπάρχουν υποβληθέντες κατάλογοι"}, status_code=400)
+
+    async def on_progress(dir_id, status, message):
+        await broadcast_sse({
+            "directory_id": dir_id,
+            "step": "nap_check",
+            "status": status,
+            "message": message,
+        })
+
+    async def run_check():
+        await broadcast_sse({"directory_id": "nap", "step": "start", "status": "running", "message": "Ξεκινάει NAP έλεγχος..."})
+        results = await run_nap_check(business, dir_ids, on_progress=on_progress)
+        await broadcast_sse({"directory_id": "nap", "step": "done", "status": "complete", "message": "NAP έλεγχος ολοκληρώθηκε", "results": results})
+
+    asyncio.create_task(run_check())
+    return {"message": "NAP check started", "directories": dir_ids}
 
 
 # --- Automation ---

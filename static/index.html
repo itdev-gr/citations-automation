@@ -45,6 +45,7 @@
     <div class="tab active" data-tab="businesses">Επιχειρήσεις</div>
     <div class="tab" data-tab="submit">Υποβολή</div>
     <div class="tab" data-tab="status">Κατάσταση</div>
+    <div class="tab" data-tab="nap">NAP Checker</div>
     <div class="tab" data-tab="guide">Οδηγός</div>
     <div class="tab" data-tab="settings">Ρυθμίσεις</div>
 </div>
@@ -234,6 +235,47 @@
                 </table>
             </div>
             <div class="empty" id="emptyStatus">Δεν υπάρχουν καταχωρήσεις ακόμα.</div>
+        </div>
+    </div>
+
+    <!-- NAP CHECKER -->
+    <div class="tab-content" id="tab-nap">
+        <div class="card" style="background:linear-gradient(135deg,#f0fdf4,#dcfce7);border:1px solid #86efac">
+            <h2 style="margin-bottom:4px">NAP Consistency Checker</h2>
+            <p style="color:var(--gray-500)">
+                Ελέγχει αν τα στοιχεία Name, Address, Phone (NAP) είναι σωστά και συνεπή σε κάθε κατάλογο.
+            </p>
+        </div>
+
+        <div class="card">
+            <h2>1. Επιλέξτε Επιχείρηση</h2>
+            <select id="napBusinessSelect" style="width:100%;padding:10px;border:1px solid var(--gray-300);border-radius:6px;font-size:14px">
+                <option value="">-- Επιλέξτε επιχείρηση --</option>
+            </select>
+            <div style="margin-top:12px">
+                <button class="btn btn-success" onclick="startNapCheck()">Έλεγχος NAP</button>
+            </div>
+        </div>
+
+        <div class="card" id="napResults" style="display:none">
+            <h2>Αποτελέσματα NAP</h2>
+            <div id="napScore" style="text-align:center;padding:16px;margin-bottom:16px;border-radius:8px;font-size:20px;font-weight:bold"></div>
+            <div class="table-wrap">
+                <table id="napTable">
+                    <thead>
+                        <tr>
+                            <th>Κατάλογος</th>
+                            <th>Βρέθηκε</th>
+                            <th>Name</th>
+                            <th>Address</th>
+                            <th>Phone</th>
+                            <th>Link</th>
+                        </tr>
+                    </thead>
+                    <tbody id="napTableBody"></tbody>
+                </table>
+            </div>
+            <div id="napProgress" style="margin-top:12px;font-size:13px;color:var(--gray-500)"></div>
         </div>
     </div>
 

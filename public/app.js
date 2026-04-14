@@ -660,12 +660,12 @@ async function resubmitDir(businessId, dirId) {
     });
     await loadSubmissions();
 
-    // Run auto-submit for just this directory
+    // Run auto-submit for just this directory (force=true to bypass duplicate check)
     try {
         const res = await fetch(`${AUTOMATION_API}/api/automate`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ business_id: businessId, directories: [dirId] }),
+            body: JSON.stringify({ business_id: businessId, directories: [dirId], force: true }),
         });
         if (res.ok) {
             // Re-render to show running state

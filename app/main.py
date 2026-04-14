@@ -312,9 +312,9 @@ async def start_automation(req: SubmissionRequest):
             if dir_id not in AUTOMATION_MAP:
                 continue
 
-            # Internal duplicate check — skip if already submitted
+            # Internal duplicate check — skip if already submitted (unless force=True)
             existing = get_submission(req.business_id, dir_id)
-            if existing and existing.get("status") == "submitted":
+            if not req.force and existing and existing.get("status") == "submitted":
                 await broadcast_sse({
                     "directory_id": dir_id, "step": "complete",
                     "status": "already_listed",

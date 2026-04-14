@@ -34,6 +34,7 @@ class BusinessUpdate(BusinessCreate):
 class SubmissionRequest(BaseModel):
     business_id: int
     directories: list[str]
+    force: bool = False
 
 
 class HumanActionComplete(BaseModel):

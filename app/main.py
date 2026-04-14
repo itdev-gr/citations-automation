@@ -20,20 +20,6 @@ from .automations.vrisko import VriskoAutomation
 from .automations.vres import VresAutomation
 from .automations.findhere import FindHereAutomation
 from .automations.stigmap import StigMapAutomation
-from .automations.europages import EuropagesAutomation
-from .automations.foursquare import FoursquareAutomation
-from .automations.cybo import CyboAutomation
-from .automations.waze import WazeAutomation
-from .automations.tomtom import TomTomAutomation
-from .automations.here import HereAutomation
-from .automations.openstreetmap import OpenStreetMapAutomation
-from .automations.tupalo import TupaloAutomation
-from .automations.brownbook import BrownbookAutomation
-from .automations.storeboard import StoreboardAutomation
-from .automations.showmelocal import ShowMeLocalAutomation
-from .automations.globalcatalog import GlobalCatalogAutomation
-from .automations.twofindlocal import TwoFindLocalAutomation
-from .automations.trustpilot import TrustpilotAutomation
 from .automations.citymaps import CityMapsAutomation
 
 AUTOMATION_MAP = {
@@ -42,47 +28,15 @@ AUTOMATION_MAP = {
     "vres": VresAutomation,
     "findhere": FindHereAutomation,
     "stigmap": StigMapAutomation,
-    "waze": WazeAutomation,
-    "tomtom": TomTomAutomation,
-    "here": HereAutomation,
-    "openstreetmap": OpenStreetMapAutomation,
-    "foursquare": FoursquareAutomation,
-    "tupalo": TupaloAutomation,
-    "europages": EuropagesAutomation,
-    "cybo": CyboAutomation,
-    "brownbook": BrownbookAutomation,
-    "storeboard": StoreboardAutomation,
-    "showmelocal": ShowMeLocalAutomation,
-    "globalcatalog": GlobalCatalogAutomation,
-    "twofindlocal": TwoFindLocalAutomation,
-    "trustpilot": TrustpilotAutomation,
     "citymaps": CityMapsAutomation,
 }
 
 DIRECTORIES = [
-    # Ελληνικοί
     {"id": "xo_gr", "name": "Χρυσός Οδηγός (xo.gr)", "url": "https://www.xo.gr", "type": "Ελληνικός"},
     {"id": "vrisko", "name": "Vrisko.gr (11880)", "url": "https://www.vrisko.gr", "type": "Ελληνικός"},
     {"id": "vres", "name": "Vres.gr", "url": "https://www.vres.gr", "type": "Ελληνικός"},
     {"id": "findhere", "name": "FindHere.gr", "url": "https://www.findhere.gr", "type": "Ελληνικός"},
     {"id": "stigmap", "name": "StigMap.gr", "url": "https://www.stigmap.gr", "type": "Ελληνικός"},
-    # Χάρτες
-    {"id": "waze", "name": "Waze", "url": "https://www.waze.com", "type": "Χάρτες"},
-    {"id": "tomtom", "name": "TomTom", "url": "https://www.tomtom.com", "type": "Χάρτες"},
-    {"id": "here", "name": "HERE WeGo", "url": "https://wego.here.com", "type": "Χάρτες"},
-    {"id": "openstreetmap", "name": "OpenStreetMap", "url": "https://www.openstreetmap.org", "type": "Χάρτες"},
-    # Reviews
-    {"id": "foursquare", "name": "Foursquare", "url": "https://foursquare.com", "type": "Reviews"},
-    {"id": "tupalo", "name": "Tupalo", "url": "https://www.tupalo.co", "type": "Reviews"},
-    # Ευρωπαϊκοί / Διεθνείς
-    {"id": "europages", "name": "Europages", "url": "https://www.europages.gr", "type": "Ευρωπαϊκός"},
-    {"id": "cybo", "name": "Cybo", "url": "https://www.cybo.com", "type": "Διεθνής"},
-    {"id": "brownbook", "name": "Brownbook.net", "url": "https://www.brownbook.net", "type": "Διεθνής"},
-    {"id": "storeboard", "name": "Storeboard", "url": "https://www.storeboard.com", "type": "Διεθνής"},
-    {"id": "showmelocal", "name": "ShowMeLocal", "url": "https://www.showmelocal.com", "type": "Διεθνής"},
-    {"id": "globalcatalog", "name": "GlobalCatalog", "url": "https://www.globalcatalog.com", "type": "Διεθνής"},
-    {"id": "twofindlocal", "name": "2FindLocal", "url": "https://www.2findlocal.com", "type": "Διεθνής"},
-    {"id": "trustpilot", "name": "Trustpilot", "url": "https://www.trustpilot.com", "type": "Reviews"},
     {"id": "citymaps", "name": "CityMaps.gr", "url": "https://citymaps.gr", "type": "Ελληνικός"},
 ]
 

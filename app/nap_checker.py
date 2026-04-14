@@ -15,38 +15,6 @@ DIRECTORY_SEARCH = {
         "search_url": "https://www.vrisko.gr/search/{name}/{city}",
         "result_selector": ".result-title a, .listing-title a, h3 a",
     },
-    "brownbook": {
-        "search_url": "https://www.brownbook.net/businesses/{name}+{city}/",
-        "result_selector": ".business-name a, h2 a, .listing-title a",
-    },
-    "cybo": {
-        "search_url": "https://www.cybo.com/search/?q={name}+{city}&loc=Greece",
-        "result_selector": ".company-name a, h2 a, .listing-title a",
-    },
-    "foursquare": {
-        "search_url": "https://foursquare.com/explore?near={city}&q={name}",
-        "result_selector": ".venueTitle a, h2 a",
-    },
-    "tupalo": {
-        "search_url": "https://www.tupalo.co/search?q={name}&where={city}",
-        "result_selector": ".venue-name a, h3 a",
-    },
-    "globalcatalog": {
-        "search_url": "https://www.globalcatalog.com/search.aspx?q={name}+{city}",
-        "result_selector": ".company-name a, h3 a",
-    },
-    "showmelocal": {
-        "search_url": "https://www.showmelocal.com/search?q={name}&loc={city}",
-        "result_selector": ".business-name a, h3 a",
-    },
-    "trustpilot": {
-        "search_url": "https://www.trustpilot.com/search?query={name}",
-        "result_selector": ".business-unit-card a, h3 a",
-    },
-    "europages": {
-        "search_url": "https://www.europages.co.uk/companies/{name}.html",
-        "result_selector": ".company-name a, h3 a",
-    },
 }
 
 

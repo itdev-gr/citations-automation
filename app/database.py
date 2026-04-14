@@ -8,9 +8,10 @@ DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "cita
 DIRECTORIES = [
     {"id": "xo_gr", "name": "Χρυσός Οδηγός (xo.gr)", "url": "https://www.xo.gr", "type": "Greek"},
     {"id": "vrisko", "name": "Vrisko.gr (11880)", "url": "https://www.vrisko.gr", "type": "Greek"},
-    {"id": "europages", "name": "Europages", "url": "https://www.europages.gr", "type": "European"},
-    {"id": "foursquare", "name": "Foursquare", "url": "https://foursquare.com", "type": "Global"},
-    {"id": "cybo", "name": "Cybo", "url": "https://www.cybo.com", "type": "International"},
+    {"id": "vres", "name": "Vres.gr", "url": "https://www.vres.gr", "type": "Greek"},
+    {"id": "findhere", "name": "FindHere.gr", "url": "https://www.findhere.gr", "type": "Greek"},
+    {"id": "stigmap", "name": "StigMap.gr", "url": "https://www.stigmap.gr", "type": "Greek"},
+    {"id": "citymaps", "name": "CityMaps.gr", "url": "https://citymaps.gr", "type": "Greek"},
 ]
 
 

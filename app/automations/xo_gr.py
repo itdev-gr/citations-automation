@@ -79,64 +79,65 @@ class XoGrAutomation(BaseAutomation):
     registration_url = "https://www.xo.gr/dorean-katachorisi/"
 
     async def fill_form(self, page: Page, business: dict):
+        import asyncio
+
         # Close cookie banner if present
         await self.safe_click(page, '#CybotCookiebotDialogBodyLevelButtonLevelOptinAllowAll, .cookiescript_accept', timeout=3000)
 
         # Business name (required)
-        await self.safe_fill(page, 'input#business_name', business.get("name", ""))
+        await self.safe_fill(page, 'input#business_name', business.get("name", ""), field_name="Επωνυμία")
 
         # Phone (required)
-        await self.safe_fill(page, 'input#main_phone', business.get("phone", ""))
+        await self.safe_fill(page, 'input#main_phone', business.get("phone", ""), field_name="Τηλέφωνο")
 
         # Mobile
-        await self.safe_fill(page, 'input#BusinessMobile', business.get("mobile", ""))
+        await self.safe_fill(page, 'input#BusinessMobile', business.get("mobile", ""), field_name="Κινητό")
 
         # Address
-        await self.safe_fill(page, 'input#BusinessAddress', business.get("address", ""))
+        await self.safe_fill(page, 'input#BusinessAddress', business.get("address", ""), field_name="Διεύθυνση")
 
         # Postal code
-        await self.safe_fill(page, 'input#BusinessPostCode', business.get("postal_code", ""))
+        await self.safe_fill(page, 'input#BusinessPostCode', business.get("postal_code", ""), field_name="Τ.Κ.")
 
         # Prefecture (select dropdown)
         prefecture = get_prefecture_value(business.get("region", "") or business.get("city", ""))
         if prefecture:
-            await self.safe_select(page, 'select#BusinessPrefectureId', prefecture)
-            import asyncio
+            await self.safe_select(page, 'select#BusinessPrefectureId', prefecture, field_name="Νομός")
             await asyncio.sleep(0.5)
 
         # City (autocomplete - type slowly)
-        await self.type_slowly(page, 'input#BusinessCity', business.get("city", ""))
-        import asyncio
+        await self.type_slowly(page, 'input#BusinessCity', business.get("city", ""), field_name="Πόλη")
         await asyncio.sleep(1)
-        # Try to click first autocomplete suggestion
         await self.safe_click(page, '.ui-autocomplete .ui-menu-item:first-child, .ui-autocomplete li:first-child', timeout=2000)
 
         # Business activity / category (autocomplete)
         category = business.get("category", "")
         if category:
-            await self.type_slowly(page, 'input#BusinessActivity', category)
+            await self.type_slowly(page, 'input#BusinessActivity', category, field_name="Κατηγορία")
             await asyncio.sleep(1)
             await self.safe_click(page, '.ui-autocomplete .ui-menu-item:first-child, .ui-autocomplete li:first-child', timeout=2000)
 
         # Specialization
         desc = business.get("description_gr", "")
         if desc:
-            await self.safe_fill(page, 'input#BusinessSpecialization', desc[:200])
+            await self.safe_fill(page, 'input#BusinessSpecialization', desc[:200], field_name="Εξειδίκευση")
 
         # Contact person
-        await self.safe_fill(page, 'input#contactPersonName', business.get("contact_person", ""))
+        await self.safe_fill(page, 'input#contactPersonName', business.get("contact_person", ""), field_name="Υπεύθυνος")
 
         # Contact position
-        await self.safe_fill(page, 'input#contactPersonPosition', 'Ιδιοκτήτης')
+        await self.safe_fill(page, 'input#contactPersonPosition', 'Ιδιοκτήτης', field_name="Θέση")
 
         # Contact phone
-        await self.safe_fill(page, 'input#contactPersonContactPhone', business.get("phone", ""))
+        await self.safe_fill(page, 'input#contactPersonContactPhone', business.get("phone", ""), field_name="Τηλ. Επικοινωνίας")
 
-        # Contact email
-        await self.safe_fill(page, 'input#contactPersonContactEmail', business.get("email", ""))
+        # Contact email (CRITICAL - needed for verification)
+        email_filled = await self.safe_fill(page, 'input#contactPersonContactEmail', business.get("email", ""), field_name="Email")
+        if not email_filled and business.get("email"):
+            await self.emit("fill", "running", "ΠΡΟΣΟΧΗ: Το πεδίο email δεν βρέθηκε! Δεν θα έρθει verification email.")
 
         # Website
-        await self.safe_fill(page, 'input#contactPersonContactWebsite', business.get("website", ""))
+        await self.safe_fill(page, 'input#contactPersonContactWebsite', business.get("website", ""), field_name="Website")
 
         # Newsletter checkbox (optional)
         await self.safe_click(page, 'input#cbAcceptedInfo', timeout=2000)
@@ -151,14 +152,35 @@ class XoGrAutomation(BaseAutomation):
                 "Χρυσός Οδηγός: Δεν λύθηκε αυτόματα το CAPTCHA. Λύστε το χειροκίνητα και πατήστε 'Συνέχεια'."
             )
 
-        # Click submit button
-        await self.safe_click(page, 'button[type="submit"], input[type="submit"], .freelisting-submit-btn, #submitBtn')
+        url_before = page.url
 
-        await asyncio.sleep(3)
+        # Click submit button
+        clicked = await self.safe_click(page, 'button[type="submit"], input[type="submit"], .freelisting-submit-btn, #submitBtn')
+        if not clicked:
+            return AutomationResult(
+                success=False,
+                directory_id=self.directory_id,
+                message=f"XO.gr: Δεν βρέθηκε το κουμπί υποβολής. {self.field_summary()}",
+            )
+
+        await asyncio.sleep(5)
+
+        # Verify submission
+        result = await self.verify_submission(
+            page, url_before,
+            success_indicators=[
+                "Ευχαριστούμε", "ευχαριστούμε", "επιτυχ", "καταχώρηση",
+                ".success", ".alert-success", ".thank-you",
+            ],
+            error_indicators=[
+                ".field-validation-error", ".validation-summary-errors",
+                ".alert-danger", "υποχρεωτικό", "απαιτείται",
+            ],
+        )
 
         return AutomationResult(
-            success=True,
+            success=result["success"],
             directory_id=self.directory_id,
-            message="XO.gr: Φόρμα υποβλήθηκε. Ελέγξτε το email σας για επαλήθευση.",
-            url="https://www.xo.gr",
+            message=f"XO.gr: {result['message']} {self.field_summary()}",
+            url=page.url if result["success"] else "",
         )

@@ -90,6 +90,8 @@ class BaseAutomation:
     def __init__(self, on_progress: Optional[Callable] = None):
         self.on_progress = on_progress
         self._human_event = asyncio.Event()
+        self.filled_fields: list[str] = []
+        self.failed_fields: list[str] = []
 
     async def emit(self, step: str, status: str, message: str):
         if self.on_progress:
@@ -162,9 +164,10 @@ class BaseAutomation:
             await asyncio.sleep(2)
 
             # Look for the business name in search results
+            safe_name = name.replace('"', '\\"').lower()
             found = await page.evaluate(f"""
                 () => {{
-                    const name = "{name.replace('"', '\\"').lower()}";
+                    const name = "{safe_name}";
                     const links = document.querySelectorAll('a');
                     for (const link of links) {{
                         if (link.textContent.toLowerCase().includes(name) && link.href) {{
@@ -220,7 +223,18 @@ class BaseAutomation:
                 await page.goto(self.registration_url, wait_until="domcontentloaded", timeout=30000)
 
                 await self.emit("fill", "running", "Συμπλήρωση πεδίων...")
+                self.filled_fields = []
+                self.failed_fields = []
                 await self.fill_form(page, business)
+
+                summary = self.field_summary()
+                if self.failed_fields:
+                    await self.emit("fill", "running", f"Προσοχή: {summary}")
+                else:
+                    await self.emit("fill", "running", f"OK: {summary}")
+
+                # Screenshot before submit (filled form)
+                await self._take_screenshot(page, business, suffix="_pre_submit")
 
                 await self.emit("submit", "running", "Υποβολή...")
                 result = await self.submit(page, business)
@@ -245,12 +259,12 @@ class BaseAutomation:
                 message=error_msg,
             )
 
-    async def _take_screenshot(self, page: Page, business: dict) -> str:
+    async def _take_screenshot(self, page: Page, business: dict, suffix: str = "") -> str:
         """Take a screenshot as proof of submission."""
         try:
             os.makedirs("/opt/citations/screenshots", exist_ok=True)
             biz_name = (business.get("name", "unknown")).replace(" ", "_").replace("/", "_")[:30]
-            filename = f"{self.directory_id}_{biz_name}_{int(asyncio.get_event_loop().time())}.png"
+            filename = f"{self.directory_id}_{biz_name}{suffix}_{int(asyncio.get_event_loop().time())}.png"
             path = f"/opt/citations/screenshots/{filename}"
             await page.screenshot(path=path, full_page=True)
             return filename
@@ -269,42 +283,149 @@ class BaseAutomation:
             message="Υποβλήθηκε επιτυχώς",
         )
 
+    # --- Post-submit validation helpers ---
+
+    async def check_page_errors(self, page: Page) -> list[str]:
+        """Scan the page for visible error messages after submit."""
+        try:
+            errors = await page.evaluate("""
+                () => {
+                    const selectors = [
+                        '.error', '.error-message', '.field-validation-error',
+                        '.alert-danger', '.alert-error', '.validation-summary-errors',
+                        '.form-error', '.invalid-feedback', '[class*="error"]:not(script):not(style)',
+                        '.text-danger', '.has-error .help-block',
+                    ];
+                    const found = [];
+                    for (const sel of selectors) {
+                        for (const el of document.querySelectorAll(sel)) {
+                            const text = el.textContent.trim();
+                            if (text && text.length > 2 && text.length < 500 && el.offsetParent !== null) {
+                                found.push(text);
+                            }
+                        }
+                    }
+                    return [...new Set(found)].slice(0, 5);
+                }
+            """)
+            return errors
+        except Exception:
+            return []
+
+    async def verify_submission(self, page: Page, url_before: str,
+                                success_indicators: list[str] = None,
+                                error_indicators: list[str] = None) -> dict:
+        """Verify whether the form was actually submitted successfully.
+        Returns {"success": bool, "message": str}."""
+        success_indicators = success_indicators or []
+        error_indicators = error_indicators or []
+
+        # 1. Check for page errors
+        errors = await self.check_page_errors(page)
+        if errors:
+            return {"success": False, "message": f"Σφάλματα: {'; '.join(errors[:3])}"}
+
+        # 2. Check for error indicator selectors/text
+        for indicator in error_indicators:
+            try:
+                if indicator.startswith('.') or indicator.startswith('#') or indicator.startswith('['):
+                    el = page.locator(indicator)
+                    if await el.count() > 0 and await el.first.is_visible():
+                        text = (await el.first.text_content() or "").strip()
+                        return {"success": False, "message": f"Σφάλμα: {text or indicator}"}
+                else:
+                    # Text search
+                    el = page.get_by_text(indicator)
+                    if await el.count() > 0:
+                        return {"success": False, "message": f"Σφάλμα: {indicator}"}
+            except Exception:
+                continue
+
+        # 3. Check URL change (redirect = likely success)
+        url_changed = page.url != url_before
+
+        # 4. Check for success indicator selectors/text
+        for indicator in success_indicators:
+            try:
+                if indicator.startswith('.') or indicator.startswith('#') or indicator.startswith('['):
+                    el = page.locator(indicator)
+                    if await el.count() > 0:
+                        return {"success": True, "message": "Επιτυχής υποβολή."}
+                else:
+                    el = page.get_by_text(indicator)
+                    if await el.count() > 0:
+                        return {"success": True, "message": f"Επιτυχής υποβολή ({indicator})."}
+            except Exception:
+                continue
+
+        # 5. If URL changed, likely success
+        if url_changed:
+            return {"success": True, "message": f"Redirect σε: {page.url}"}
+
+        # 6. Uncertain - no success/error signals found
+        return {"success": False, "message": "Δεν εντοπίστηκε επιβεβαίωση υποβολής. Η φόρμα μπορεί να μην υποβλήθηκε."}
+
+    def field_summary(self) -> str:
+        """Return a summary of filled/failed fields."""
+        parts = []
+        if self.filled_fields:
+            parts.append(f"Συμπληρώθηκαν {len(self.filled_fields)}/{len(self.filled_fields) + len(self.failed_fields)} πεδία")
+        if self.failed_fields:
+            parts.append(f"Απέτυχαν: {', '.join(self.failed_fields)}")
+        return ". ".join(parts)
+
     # Helper methods for common form operations
-    async def safe_fill(self, page: Page, selector: str, value: str, timeout: int = 5000):
-        """Fill a field if it exists, skip if not found."""
+    async def safe_fill(self, page: Page, selector: str, value: str, timeout: int = 5000, field_name: str = "") -> bool:
+        """Fill a field if it exists. Returns True on success."""
         if not value:
-            return
+            return True  # Empty value is not a failure
         try:
             await page.wait_for_selector(selector, timeout=timeout)
             await page.fill(selector, value)
+            if field_name:
+                self.filled_fields.append(field_name)
+            return True
         except Exception:
-            pass
+            if field_name:
+                self.failed_fields.append(field_name)
+            return False
 
-    async def safe_click(self, page: Page, selector: str, timeout: int = 5000):
-        """Click an element if it exists."""
+    async def safe_click(self, page: Page, selector: str, timeout: int = 5000) -> bool:
+        """Click an element if it exists. Returns True on success."""
         try:
             await page.wait_for_selector(selector, timeout=timeout)
             await page.click(selector)
+            return True
         except Exception:
-            pass
+            return False
 
-    async def safe_select(self, page: Page, selector: str, value: str, timeout: int = 5000):
-        """Select an option if the select exists."""
+    async def safe_select(self, page: Page, selector: str, value: str, timeout: int = 5000, field_name: str = "") -> bool:
+        """Select an option if the select exists. Returns True on success."""
         if not value:
-            return
+            return True
         try:
             await page.wait_for_selector(selector, timeout=timeout)
             await page.select_option(selector, value)
+            if field_name:
+                self.filled_fields.append(field_name)
+            return True
         except Exception:
-            pass
+            if field_name:
+                self.failed_fields.append(field_name)
+            return False
 
-    async def type_slowly(self, page: Page, selector: str, value: str, delay: int = 50):
-        """Type text character by character (useful for autocomplete fields)."""
+    async def type_slowly(self, page: Page, selector: str, value: str, delay: int = 50, field_name: str = "") -> bool:
+        """Type text character by character. Returns True on success."""
         if not value:
-            return
+            return True
         try:
             await page.wait_for_selector(selector, timeout=5000)
             await page.click(selector)
             await page.type(selector, value, delay=delay)
+            if field_name:
+                self.filled_fields.append(field_name)
+            return True
         except Exception:
-            pass
+            if field_name:
+                self.failed_fields.append(field_name)
+            return False
